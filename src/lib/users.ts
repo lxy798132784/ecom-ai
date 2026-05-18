@@ -1,7 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const USER_FILE = path.join(process.cwd(), 'data', 'users.json');
+import { kv } from '@vercel/kv';
 
 interface User {
   id: string;
@@ -12,22 +9,24 @@ interface User {
   createdAt: string;
 }
 
-export function readUsers(): User[] {
+export async function readUsers(): Promise<User[]> {
   try {
-    if (!fs.existsSync(USER_FILE)) return [];
-    const raw = fs.readFileSync(USER_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const users = await kv.hgetall('users');
+    if (!users) return [];
+    return Object.values(users) as User[];
   } catch {
     return [];
   }
 }
 
-export function writeUsers(users: User[]) {
-  const dir = path.dirname(USER_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(USER_FILE, JSON.stringify(users, null, 2));
+export async function writeUser(user: User) {
+  await kv.hset('users', { [user.email]: user });
 }
 
-export function findUserByEmail(email: string): User | undefined {
-  return readUsers().find(u => u.email === email);
+export async function findUserByEmail(email: string): Promise<User | undefined> {
+  try {
+    return (await kv.hget('users', email)) as User | undefined;
+  } catch {
+    return undefined;
+  }
 }

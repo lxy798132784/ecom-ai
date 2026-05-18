@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { readUsers, writeUsers } from '../../../lib/users';
+import { findUserByEmail } from '../../../lib/users';
 
 export default NextAuth({
   providers: [
@@ -13,8 +13,7 @@ export default NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const users = readUsers();
-        const user = users.find(u => u.email === credentials.email);
+        const user = await findUserByEmail(credentials.email);
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
@@ -24,17 +23,11 @@ export default NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.plan = (user as any).plan || 'free';
-        token.usage = 0;
-      }
+      if (user) { token.plan = (user as any).plan || 'free'; token.usage = 0; }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).plan = token.plan;
-        (session.user as any).usage = token.usage;
-      }
+      if (session.user) { (session.user as any).plan = token.plan; (session.user as any).usage = token.usage; }
       return session;
     },
   },
