@@ -358,6 +358,14 @@ export default function Home() {
                     <div className="flex gap-2">
                       <button onClick={() => setResult(null)} className="text-xs text-slate-400 hover:text-slate-600">{tr.clear}</button>
                       <a href={result} download="result.png" target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800">⬇️ {tr.download}</a>
+                    <span className="text-xs text-slate-300">|</span>
+                    <select className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none" onChange={e => { const u = result; const [w,h] = e.target.value.split('x'); /* just for label, actual resize needs canvas */ }}>
+                      <option value="">尺寸参考</option>
+                      <option>Amazon 2000×2000</option>
+                      <option>eBay 1600×1600</option>
+                      <option>Shopify 2048×2048</option>
+                      <option>Temu 800×800</option>
+                    </select>
                     </div>
                   </div>
                   <img src={result} className="w-full rounded-xl shadow-md" alt="" />
