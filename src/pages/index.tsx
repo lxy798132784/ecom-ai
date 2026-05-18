@@ -88,6 +88,8 @@ export default function Home() {
   const [lang, setLangState] = useState<Lang>('zh');
   const [exportSize, setExportSize] = useState('');
   const [resizedUrl, setResizedUrl] = useState('');
+  const [fitMode, setFitMode] = useState<'fill'|'fit'>('fill');
+  const [bgColor, setBgColor] = useState('#ffffff');
   const tr = t[lang];
   const downloadUrl = resizedUrl || result;
   const userPlan = (session?.user as any)?.plan || 'free';
@@ -111,10 +113,18 @@ export default function Home() {
     img.onload = () => {
       const canvas = document.createElement('canvas'); canvas.width = tw; canvas.height = th;
       const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tw, th);
-      const scale = Math.min(tw / img.width, th / img.height);
-      const sw = img.width * scale, sh = img.height * scale;
-      ctx.drawImage(img, (tw - sw) / 2, (th - sh) / 2, sw, sh);
+      ctx.fillStyle = bgColor; ctx.fillRect(0, 0, tw, th);
+      if (fitMode === 'fill') {
+        // Fill mode: cover entire canvas, crop excess
+        const scale = Math.max(tw / img.width, th / img.height);
+        const sw = img.width * scale, sh = img.height * scale;
+        ctx.drawImage(img, (tw - sw) / 2, (th - sh) / 2, sw, sh);
+      } else {
+        // Fit mode: fit entire image, add padding
+        const scale = Math.min(tw / img.width, th / img.height);
+        const sw = img.width * scale, sh = img.height * scale;
+        ctx.drawImage(img, (tw - sw) / 2, (th - sh) / 2, sw, sh);
+      }
       setResizedUrl(canvas.toDataURL('image/jpeg', 0.92)); setExportSize(sizeKey);
     };
     img.src = result.startsWith('data:') ? result : result + '?_t=' + Date.now();
@@ -378,6 +388,11 @@ export default function Home() {
                       <button onClick={() => setResult(null)} className="text-xs text-slate-400 hover:text-slate-600">{tr.clear}</button>
                       <a href={downloadUrl || '#'} download={`ecompic-${exportSize || 'original'}.jpg`} target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800">⬇️ {tr.download}{exportSize ? ` (${exportSize})` : ''}</a>
                     <span className="text-xs text-slate-300">|</span>
+                    <button onClick={() => setFitMode(m => m === 'fill' ? 'fit' : 'fill')}
+                      className={`text-xs px-2 py-1 rounded-lg border transition ${fitMode === 'fill' ? 'bg-slate-100 border-slate-300' : 'border-slate-200'}`}
+                      title={fitMode === 'fill' ? '铺满（裁边）' : '留白（完整）'}>
+                      {fitMode === 'fill' ? '📐 铺满' : '🖼️ 完整'}
+                    </button>
                     <select value={exportSize} className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none" onChange={e => resizeToSize(e.target.value)}>
                       <option value="">原尺寸</option>
                       <option value="amazon">Amazon 2000×2000</option>
