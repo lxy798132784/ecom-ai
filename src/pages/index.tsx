@@ -190,6 +190,19 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Login prompt for non-logged-in users */}
+        {status !== 'loading' && !loggedIn && (
+          <div className="max-w-lg mx-auto mt-4 px-4">
+            <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5 text-center">
+              <p className="text-sm text-brand-700 mb-2">🔐 登录后即可使用 AI 生图</p>
+              <div className="flex justify-center gap-3">
+                <button onClick={() => { setShowLogin(true); setAuthError(''); }} className="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-brand-700">{tr.login}</button>
+                <button onClick={() => { setShowRegister(true); setAuthError(''); }} className="bg-white text-brand-600 border border-brand-300 px-5 py-2 rounded-xl text-sm font-medium hover:bg-brand-50">{tr.register}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mode Tabs */}
         <div className="flex justify-center mt-8 mb-4">
           <div className="bg-slate-100 rounded-xl p-1 inline-flex">
