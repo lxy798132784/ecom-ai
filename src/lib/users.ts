@@ -1,4 +1,12 @@
-import { kv } from '@vercel/kv';
+// User storage: Vercel KV (production) or in-memory (fallback)
+let memoryStore: Record<string, any> = {};
+
+async function getKV() {
+  try {
+    const { kv } = await import('@vercel/kv');
+    return kv;
+  } catch { return null; }
+}
 
 interface User {
   id: string;
@@ -9,24 +17,18 @@ interface User {
   createdAt: string;
 }
 
-export async function readUsers(): Promise<User[]> {
-  try {
-    const users = await kv.hgetall('users');
-    if (!users) return [];
-    return Object.values(users) as User[];
-  } catch {
-    return [];
+export async function findUserByEmail(email: string): Promise<User | undefined> {
+  const kv = await getKV();
+  if (kv) {
+    try { return (await kv.hget('users', email)) as User | undefined; } catch {}
   }
+  return memoryStore[email] as User | undefined;
 }
 
 export async function writeUser(user: User) {
-  await kv.hset('users', { [user.email]: user });
-}
-
-export async function findUserByEmail(email: string): Promise<User | undefined> {
-  try {
-    return (await kv.hget('users', email)) as User | undefined;
-  } catch {
-    return undefined;
+  const kv = await getKV();
+  if (kv) {
+    try { await kv.hset('users', { [user.email]: user }); return; } catch {}
   }
+  memoryStore[user.email] = user;
 }
