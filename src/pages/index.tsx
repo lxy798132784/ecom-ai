@@ -82,6 +82,9 @@ export default function Home() {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
   const [usageLimit, setUsageLimit] = useState(5);
   const [credits, setCredits] = useState(0);
@@ -175,6 +178,17 @@ export default function Home() {
     const res = await signIn('credentials', { email: authEmail, password: authPassword, redirect: false });
     if (res?.error) { setAuthError(tr.authError); return; }
     setShowLogin(false); setAuthEmail(''); setAuthPassword('');
+  };
+
+  const doForgot = async () => {
+    setAuthError('');
+    if (!forgotEmail.trim()) { setAuthError(tr.pleaseFill); return; }
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail }),
+    });
+    if (!res.ok) { const d = await res.json(); setAuthError(d.error); return; }
+    setForgotSent(true);
   };
 
   const doRegister = async () => {
@@ -437,9 +451,31 @@ export default function Home() {
             className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400"
             onKeyDown={e => e.key === 'Enter' && doLogin()} />
           <button onClick={doLogin} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">{tr.login}</button>
+          <button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); }} className="w-full text-center text-xs text-slate-400 hover:text-brand-600 mt-2">忘记密码？</button>
           <p className="text-center text-sm text-slate-400 mt-3">
             {tr.noAccount} <button onClick={() => { setShowLogin(false); setShowRegister(true); }} className="text-brand-600 hover:underline">{tr.register}</button>
           </p>
+        </Modal>
+
+        {/* Forgot Password Modal */}
+        <Modal show={showForgot} title="🔑 忘记密码" onClose={() => setShowForgot(false)}>
+          {forgotSent ? (
+            <div className="text-center">
+              <p className="text-5xl mb-4">📧</p>
+              <p className="font-medium text-slate-700 mb-2">邮件已发送</p>
+              <p className="text-sm text-slate-500 mb-4">请检查 {forgotEmail} 的收件箱，点击链接重置密码（30 分钟有效）</p>
+              <button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold">返回登录</button>
+            </div>
+          ) : (
+            <>
+              {authError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4">{authError}</div>}
+              <p className="text-sm text-slate-500 mb-4">输入注册邮箱，我们会发送重置链接</p>
+              <input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="注册邮箱" type="email"
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400" />
+              <button onClick={doForgot} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">发送重置链接</button>
+              <button onClick={() => { setShowForgot(false); setShowLogin(true); }} className="w-full mt-2 text-slate-400 text-sm">返回登录</button>
+            </>
+          )}
         </Modal>
 
         {/* Register Modal */}
