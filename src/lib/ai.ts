@@ -16,7 +16,7 @@ export async function removeBackground(imageBase64: string): Promise<string> {
   const tmpPath = base64ToTempFile(imageBase64);
   try {
     const resp = await openai.images.edit({
-      model: 'dall-e-2',
+      model: 'gpt-image-1',
       image: fs.createReadStream(tmpPath) as any,
       prompt: 'Product on pure white background, professional product photography lighting, no shadows, centered, high resolution, remove all background replace with white',
       n: 1,
@@ -35,7 +35,7 @@ export async function generateLifestyleScene(
   const tmpPath = base64ToTempFile(imageBase64);
   try {
     const resp = await openai.images.edit({
-      model: 'dall-e-2',
+      model: 'gpt-image-1',
       image: fs.createReadStream(tmpPath) as any,
       prompt: `Place this product in a beautiful ${scene}. Professional photography, natural lighting, product clearly visible, high resolution, realistic`,
       n: 1,
@@ -49,7 +49,7 @@ export async function generateLifestyleScene(
 
 export async function generateAplusImage(prompt: string): Promise<string> {
   const resp = await openai.images.generate({
-    model: 'dall-e-3',
+    model: 'gpt-image-2',
     prompt: `E-commerce product infographic, Amazon A+ content style, clean design, ${prompt}, professional, high quality`,
     n: 1,
     size: '1024x1024',
