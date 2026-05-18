@@ -361,7 +361,7 @@ export default function Home() {
 
         {/* Paywall */}
         <Modal show={showPay} title={'🚀 ' + tr.upgradeTitle} onClose={() => setShowPay(false)}>
-          <p className="text-slate-500 text-center text-sm mb-4">{tr.upgradeDesc}</p>
+          <p className="text-slate-500 text-center text-sm mb-4">{usageLeft <= 0 ? tr.limitReached : tr.freeLeftDesc.replace('{left}', String(usageLeft))}</p>
 
           {/* Credit Packs */}
           <div className="space-y-3 mb-4">
