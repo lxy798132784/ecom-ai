@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { SessionProvider } from 'next-auth/react';
@@ -82,12 +82,22 @@ export default function Home() {
   const [authError, setAuthError] = useState('');
   const [usageCount, setUsageCount] = useState(0);
   const [usageLimit, setUsageLimit] = useState(5);
+  const [credits, setCredits] = useState(0);
   const [lang, setLangState] = useState<Lang>('zh');
 
   const tr = t[lang];
   const userPlan = (session?.user as any)?.plan || 'free';
   const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
+
+  // Load history & credits on login
+  useEffect(() => {
+    if (!loggedIn) return;
+    fetch('/api/history').then(r => r.json()).then(d => {
+      if (d.history) setResults(d.history);
+      if (d.credits !== undefined) setCredits(d.credits);
+    }).catch(() => {});
+  }, [loggedIn]);
 
   const toggleLang = () => {
     const next = lang === 'zh' ? 'en' : 'zh';
@@ -117,7 +127,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error('API returned empty URL');
-      setResult(data.url); setResults(p => [...p, data.url]);
+      setResult(data.url); setResults(p => [data.url, ...p]);
+      fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) }).catch(() => {});
       if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -158,6 +169,7 @@ export default function Home() {
         <div className="bg-white border-b border-slate-200">
           <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
             <span className="font-bold text-slate-800">🛍️ {tr.brand}</span>
+            {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} 次</span>)}
             <div className="flex items-center gap-3 text-sm">
               {/* Lang toggle */}
               <button onClick={toggleLang} className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition">
@@ -307,11 +319,11 @@ export default function Home() {
                   <img src={result} className="w-full rounded-xl shadow-md" alt="" />
                 </div>
               )}
-              {results.length > 1 && (
+              {results.filter((_, i) => i > 0).length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-500 mb-3">📋 {tr.history} ({results.length})</h3>
                   <div className="grid grid-cols-3 gap-3">
-                    {results.slice(0, -1).reverse().map((url, i) => (
+                    {results.filter((_, i) => i > 0).map((url, i) => (
                       <div key={i} className="bg-white rounded-xl p-2 shadow-sm border border-slate-200 cursor-pointer hover:border-brand-400" onClick={() => setResult(url)}>
                         <img src={url} className="w-full rounded-lg" alt="" />
                       </div>

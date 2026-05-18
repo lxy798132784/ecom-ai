@@ -72,6 +72,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
+    
+    // Auto-save to user history
+    try {
+      await kv.lpush(`history:${token.email}`, url);
+      await kv.ltrim(`history:${token.email}`, 0, 19);
+    } catch {}
+    
     return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit });
   } catch (e: any) {
     console.error(e);
