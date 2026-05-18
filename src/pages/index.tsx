@@ -74,9 +74,10 @@ export default function Home() {
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
   const [usageCount, setUsageCount] = useState(0);
+  const [usageLimit, setUsageLimit] = useState(FREE_LIMIT);
 
   const userPlan = (session?.user as any)?.plan || 'free';
-  const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, FREE_LIMIT - usageCount);
+  const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
 
   const onDrop = useCallback((accepted: File[]) => {
@@ -103,7 +104,7 @@ export default function Home() {
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error('API 返回空地址');
       setResult(data.url); setResults(p => [...p, data.url]);
-      setUsageCount(c => c + 1);
+      if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   };
