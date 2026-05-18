@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
 import { removeBackground, generateLifestyleScene, generateProductImage, customEdit } from '../../lib/ai';
+import { generateProductImageZhipu } from '../../lib/ai';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -58,8 +59,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let url = '';
     if (action === 'text2img') {
+      // Try Zhipu first (cheaper, domestic), fallback to OpenAI
       const textPrompt = body.prompt || body.text || scene || 'product photo';
-      url = await generateProductImage(textPrompt);
+      url = await generateProductImageZhipu(textPrompt);
+      if (!url) {
+        url = await generateProductImage(textPrompt);
+      }
     } else if (action === 'custom') {
       url = await customEdit(image, prompt || body.customPrompt || 'enhance this product photo');
     } else if (action === 'whitebg') {
