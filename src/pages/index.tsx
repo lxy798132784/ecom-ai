@@ -207,7 +207,7 @@ export default function Home() {
           <div className="grid md:grid-cols-5 gap-6">
             {/* Left */}
             <div className="md:col-span-2 space-y-4">
-              {mode === 'upload' ? (<>
+              {mode === 'upload' && (<>
               <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all bg-white ${isDragActive ? 'border-brand-500 bg-blue-50' : 'border-slate-300 hover:border-brand-400'}`}>
                 <input {...getInputProps()} />
                 {image ? <img src={image} className="max-h-48 mx-auto rounded-lg" alt="Uploaded" /> :
@@ -250,11 +250,9 @@ export default function Home() {
                   </div>)}
                 </div>
               </>)}
-              </>)}</div>
-            </div>
 
-              {/* Text-to-Image Mode */}
-              {mode === 'text' && (
+            {/* Text-to-Image Mode */}
+            {mode === 'text' && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                   <h3 className="font-semibold text-slate-700 mb-2">✍️ 描述你的产品</h3>
                   <p className="text-xs text-slate-400 mb-4">用文字描述产品，AI 生成专业产品图（中英文都行）</p>
