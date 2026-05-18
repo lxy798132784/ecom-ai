@@ -24,11 +24,10 @@ export async function removeBackground(imageBase64: string): Promise<string> {
       image: file,
       prompt: 'Product on pure white background, professional product photography lighting, no shadows, centered, high resolution',
       n: 1,
-      response_format: 'url',
     });
     const data = resp.data[0];
-    console.log('removeBackground response:', JSON.stringify(data));
-    return data?.url || '';
+    console.log('removeBackground response keys:', Object.keys(data));
+    return data?.url || data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '';
   } finally {
     fs.unlink(filePath, () => {});
   }
@@ -45,11 +44,10 @@ export async function generateLifestyleScene(
       image: file,
       prompt: `Place this product in a beautiful ${scene}. Professional photography, natural lighting, product clearly visible, high resolution, realistic`,
       n: 1,
-      response_format: 'url',
     });
     const data = resp.data[0];
-    console.log('generateLifestyleScene response:', JSON.stringify(data));
-    return data?.url || '';
+    console.log('generateLifestyleScene response keys:', Object.keys(data));
+    return data?.url || data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '';
   } finally {
     fs.unlink(filePath, () => {});
   }
