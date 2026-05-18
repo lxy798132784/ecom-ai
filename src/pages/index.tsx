@@ -2,6 +2,27 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Head from 'next/head';
 
+function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1024, maxH = 1024;
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 const SCENES = [
   { id: 'kitchen', emoji: '🍳', label: '厨房' },
   { id: 'living-room', emoji: '🛋️', label: '客厅' },
@@ -22,9 +43,12 @@ export default function Home() {
   const onDrop = useCallback((accepted: File[]) => {
     const file = accepted[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setImage(reader.result as string); setResult(null); setError(''); };
-    reader.readAsDataURL(file);
+    setError('压缩图片中...');
+    resizeImage(file).then((dataUrl) => {
+      setImage(dataUrl);
+      setResult(null);
+      setError('');
+    }).catch(() => setError('图片处理失败'));
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
