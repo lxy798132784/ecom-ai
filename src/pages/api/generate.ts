@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { removeBackground, generateLifestyleScene, generateProductImage } from '../../lib/ai';
+import { removeBackground, generateLifestyleScene, generateProductImage, customEdit } from '../../lib/ai';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -21,6 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'text2img') {
       const textPrompt = body.prompt || body.text || scene || 'product photo';
       url = await generateProductImage(textPrompt);
+    } else if (action === 'custom') {
+      const editPrompt = prompt || body.customPrompt || 'enhance this product photo';
+      url = await customEdit(image, editPrompt);
     } else if (action === 'whitebg') {
       url = await removeBackground(image, prompt || '');
     } else if (action === 'scene') {

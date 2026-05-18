@@ -64,9 +64,23 @@ export default function Home() {
   const [userPlan, setUserPlan] = useState('free');
   const [emailInp, setEmailInp] = useState('');
   const [showEmail, setShowEmail] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+
+  // Custom edit
+  const [customEditPrompt, setCustomEditPrompt] = useState('');
 
   useEffect(() => { const u = getUser(); setUserEmail(u.email || ''); setUserPlan(u.plan || 'free'); setUsageLeft(getUsageLeft()); }, []);
   const refresh = () => { setUsageLeft(getUsageLeft()); const u = getUser(); setUserPlan(u.plan || 'free'); setUserEmail(u.email || ''); };
+  const doRegister = () => {
+    if (!regEmail.trim()) return;
+    saveUser({ email: regEmail.trim(), name: regName.trim(), plan: 'free', usage: 0 });
+    setUserEmail(regEmail.trim());
+    setShowRegister(false);
+    refresh();
+  };
+
   const saveEmail = () => { if (!emailInp.trim()) return; saveUser({ email: emailInp.trim() }); setUserEmail(emailInp.trim()); setShowEmail(false); refresh(); };
 
   const onDrop = useCallback((accepted: File[]) => {
@@ -86,7 +100,7 @@ export default function Home() {
     try {
       const res = await fetch('/api/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, action, scene, prompt: promptOverride || '' }),
+        body: JSON.stringify({ image, action, scene, prompt: promptOverride || '', customPrompt: promptOverride || '' }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
@@ -98,6 +112,7 @@ export default function Home() {
 
   const doText = () => generate('text2img', '', textPrompt);
   const doWhiteBg = () => generate('whitebg', '', customPrompt);
+  const doCustom = () => generate('custom', '', customEditPrompt);
   const doScene = (sid: string) => { setSelScene(sid); generate('scene', sid, customPrompt); };
 
   return (
@@ -119,11 +134,29 @@ export default function Home() {
                   <button onClick={() => setShowPay(true)} className="bg-brand-600 text-white px-4 py-1.5 rounded-full text-xs font-medium hover:bg-brand-700 transition">升级 PRO</button>
                 </>
               )}
-              {!userEmail && !showEmail && (<button onClick={() => setShowEmail(true)} className="text-slate-400 hover:text-slate-600 text-xs">登录</button>)}
+              {!userEmail && !showEmail && (<button onClick={() => setShowRegister(true)} className="text-slate-400 hover:text-slate-600 text-xs">注册</button>)}
               {userEmail && (<span className="text-slate-400 text-xs">{userEmail}</span>)}
             </div>
           </div>
         </div>
+
+        {showRegister && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRegister(false)}>
+            <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+              <p className="text-3xl text-center mb-2">🦐</p>
+              <h2 className="text-xl font-bold text-center mb-1">注册 EcomPic</h2>
+              <p className="text-slate-400 text-center text-sm mb-6">免费试用 5 次，无需密码</p>
+              <input value={regName} onChange={e => setRegName(e.target.value)} placeholder="昵称（选填）"
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-3 outline-none focus:border-brand-400" />
+              <input value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="邮箱"
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400" />
+              <button onClick={doRegister} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">
+                免费注册
+              </button>
+              <button onClick={() => { setShowRegister(false); setShowEmail(true); }} className="w-full mt-2 text-slate-400 text-sm hover:text-slate-600">已有账号？登录</button>
+            </div>
+          </div>
+        )}
 
         {showEmail && (
           <div className="max-w-md mx-auto mt-4 px-4">
@@ -171,6 +204,21 @@ export default function Home() {
                           ))}
                         </div>
                       </div>
+                      {/* Custom Edit */}
+                      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mt-4">
+                        <h3 className="text-sm font-semibold text-slate-500 mb-2">✏️ 自由编辑原图</h3>
+                        <p className="text-xs text-slate-400 mb-2">在原图基础上变化：换色/加效果/改风格...</p>
+                        <div className="flex gap-2">
+                          <input value={customEditPrompt} onChange={e => setCustomEditPrompt(e.target.value)}
+                            placeholder="例如：变成红色、加上闪光、复古风格..."
+                            className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />
+                          <button onClick={doCustom} disabled={loading || !customEditPrompt.trim()}
+                            className="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-900 disabled:opacity-50 transition whitespace-nowrap">
+                            🎨 生成
+                          </button>
+                        </div>
+                      </div>
+                      {/* Advanced */}
                       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <button onClick={() => setShowAdv(!showAdv)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 w-full">
                           <span>{showAdv ? '🔽' : '▶️'}</span><span className="font-medium">高级选项</span>

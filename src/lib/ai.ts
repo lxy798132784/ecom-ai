@@ -60,6 +60,22 @@ export async function generateLifestyleScene(
   }
 }
 
+export async function customEdit(imageBase64: string, prompt: string): Promise<string> {
+  const { file, filePath } = base64ToFileObject(imageBase64);
+  try {
+    const resp = await openai.images.edit({
+      model: 'gpt-image-1',
+      image: file,
+      prompt: `Transform this product photo: ${prompt}. Professional e-commerce photography, high resolution, commercial quality.`,
+      n: 1,
+    });
+    const data = resp.data[0];
+    return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
+  } finally {
+    fs.unlink(filePath, () => {});
+  }
+}
+
 export async function generateProductImage(prompt: string): Promise<string> {
   const resp = await openai.images.generate({
     model: 'gpt-image-2',
