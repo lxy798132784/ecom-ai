@@ -2,6 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Head from 'next/head';
 
+/* ========== Modes ========== */
+type Mode = 'upload' | 'text';
+
 /* ========== Simple Auth ========== */
 const FREE_LIMIT = 5;
 const STORAGE_KEY = 'ecompic_user';
@@ -78,6 +81,10 @@ export default function Home() {
   const [emailInput, setEmailInput] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
 
+  // Mode
+  const [mode, setMode] = useState<Mode>('upload');
+  const [textPrompt, setTextPrompt] = useState('');
+
   useEffect(() => {
     const u = getUser();
     setUserEmail(u.email || ''); setUserPlan(u.plan || 'free');
@@ -110,7 +117,8 @@ export default function Home() {
   });
 
   const process = async (action: string, scene?: string, promptOverride?: string) => {
-    if (!image) return;
+    if (action !== 'text2img' && !image) return;
+    if (action === 'text2img' && !textPrompt.trim()) { setError('请输入产品描述'); return; }
     if (getUsageLeft() <= 0) { setShowPaywall(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
@@ -129,6 +137,7 @@ export default function Home() {
     setLoading(false);
   };
 
+  const handleText2Img = () => process('text2img', '', textPrompt);
   const handleWhiteBg = () => process('whitebg', '', customPrompt);
   const handleScene = (sceneId: string) => { setSelectedScene(sceneId); process('scene', sceneId, customPrompt); };
 
@@ -181,9 +190,24 @@ export default function Home() {
         </header>
 
         <div className="max-w-6xl mx-auto px-4 pb-20">
+          {/* Mode Switcher */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-slate-100 rounded-xl p-1 inline-flex">
+              <button onClick={() => setMode('upload')}
+                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                📸 上传产品图
+              </button>
+              <button onClick={() => setMode('text')}
+                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'text' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                ✍️ 文字生图
+              </button>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-5 gap-6">
             {/* Left */}
             <div className="md:col-span-2 space-y-4">
+              {mode === 'upload' ? (<>
               <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all bg-white ${isDragActive ? 'border-brand-500 bg-blue-50' : 'border-slate-300 hover:border-brand-400'}`}>
                 <input {...getInputProps()} />
                 {image ? <img src={image} className="max-h-48 mx-auto rounded-lg" alt="Uploaded" /> :
@@ -226,6 +250,35 @@ export default function Home() {
                   </div>)}
                 </div>
               </>)}
+              </>)}</div>
+            </div>
+
+              {/* Text-to-Image Mode */}
+              {mode === 'text' && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                  <h3 className="font-semibold text-slate-700 mb-2">✍️ 描述你的产品</h3>
+                  <p className="text-xs text-slate-400 mb-4">用文字描述产品，AI 生成专业产品图（中英文都行）</p>
+                  <textarea
+                    value={textPrompt}
+                    onChange={e => setTextPrompt(e.target.value)}
+                    placeholder="例如：一只白色的无线蓝牙耳机，放在大理石桌面上，侧面视角，柔光，高质感产品摄影..."
+                    rows={4}
+                    className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-brand-400 resize-none mb-3"
+                  />
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {PRESETS.map(p => (
+                      <button key={p.id} onClick={() => setTextPrompt(p.prompt + ' product photography, white background, studio lighting')}
+                        className="text-xs px-3 py-1.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 hover:border-brand-400 transition">
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={handleText2Img} disabled={loading}
+                    className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 disabled:opacity-50 transition">
+                    {loading ? '🎨 生成中...' : '🪄 生成产品图'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Right */}

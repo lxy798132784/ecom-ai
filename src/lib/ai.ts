@@ -34,7 +34,16 @@ export async function removeBackground(imageBase64: string, customPrompt?: strin
   }
 }
 
-export async function generateLifestyleScene(
+export async function generateProductImage(prompt: string): Promise<string> {
+  const resp = await openai.images.generate({
+    model: 'gpt-image-2',
+    prompt: `Professional e-commerce product photography, ${prompt}, studio lighting, high resolution, commercial quality, white background option`,
+    n: 1,
+    size: '1024x1024',
+  });
+  const data = resp.data[0];
+  return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
+}(
   imageBase64: string, scene: string, customPrompt?: string,
 ): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
