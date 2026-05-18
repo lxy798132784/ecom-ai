@@ -86,8 +86,10 @@ export default function Home() {
   const [usageLimit, setUsageLimit] = useState(5);
   const [credits, setCredits] = useState(0);
   const [lang, setLangState] = useState<Lang>('zh');
-
+  const [exportSize, setExportSize] = useState('');
+  const [resizedUrl, setResizedUrl] = useState('');
   const tr = t[lang];
+  const downloadUrl = resizedUrl || result;
   const userPlan = (session?.user as any)?.plan || 'free';
   const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
@@ -100,6 +102,23 @@ export default function Home() {
       if (d.credits !== undefined) setCredits(d.credits);
     }).catch(() => {});
   }, [loggedIn]);
+
+  const resizeToSize = (sizeKey: string) => {
+    if (!result || !sizeKey) { setResizedUrl(''); setExportSize(''); return; }
+    const sizes: Record<string, [number, number]> = { amazon: [2000, 2000], ebay: [1600, 1600], shopify: [2048, 2048], temu: [800, 800] };
+    const [tw, th] = sizes[sizeKey] || [1024, 1024];
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas'); canvas.width = tw; canvas.height = th;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tw, th);
+      const scale = Math.min(tw / img.width, th / img.height);
+      const sw = img.width * scale, sh = img.height * scale;
+      ctx.drawImage(img, (tw - sw) / 2, (th - sh) / 2, sw, sh);
+      setResizedUrl(canvas.toDataURL('image/jpeg', 0.92)); setExportSize(sizeKey);
+    };
+    img.src = result.startsWith('data:') ? result : result + '?_t=' + Date.now();
+  };
 
   const toggleLang = () => {
     const next = lang === 'zh' ? 'en' : 'zh';
@@ -357,18 +376,19 @@ export default function Home() {
                     <h3 className="font-semibold text-slate-700">✅ {tr.done}</h3>
                     <div className="flex gap-2">
                       <button onClick={() => setResult(null)} className="text-xs text-slate-400 hover:text-slate-600">{tr.clear}</button>
-                      <a href={result} download="result.png" target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800">⬇️ {tr.download}</a>
+                      <a href={downloadUrl || '#'} download={`ecompic-${exportSize || 'original'}.jpg`} target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800">⬇️ {tr.download}{exportSize ? ` (${exportSize})` : ''}</a>
                     <span className="text-xs text-slate-300">|</span>
-                    <select className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none" onChange={e => { const u = result; const [w,h] = e.target.value.split('x'); /* just for label, actual resize needs canvas */ }}>
-                      <option value="">尺寸参考</option>
-                      <option>Amazon 2000×2000</option>
-                      <option>eBay 1600×1600</option>
-                      <option>Shopify 2048×2048</option>
-                      <option>Temu 800×800</option>
+                    <select value={exportSize} className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none" onChange={e => resizeToSize(e.target.value)}>
+                      <option value="">原尺寸</option>
+                      <option value="amazon">Amazon 2000×2000</option>
+                      <option value="ebay">eBay 1600×1600</option>
+                      <option value="shopify">Shopify 2048×2048</option>
+                      <option value="temu">Temu 800×800</option>
                     </select>
+                    {exportSize && <button onClick={() => { setResizedUrl(''); setExportSize(''); }} className="text-xs text-slate-400 hover:text-slate-600 ml-1">×</button>}
                     </div>
                   </div>
-                  <img src={result} className="w-full rounded-xl shadow-md" alt="" />
+                  <img src={downloadUrl || result} className="w-full rounded-xl shadow-md" alt="" />
                 </div>
               )}
               {results.filter((_, i) => i > 0).length > 0 && (
