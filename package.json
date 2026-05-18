@@ -1,0 +1,27 @@
+{
+  "name": "ecom-ai",
+  "version": "1.0.0",
+  "description": "跨境电商 AI 美工 - 5分钟出图",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "openai": "^4.40.0",
+    "sharp": "^0.33.0",
+    "react-dropzone": "^14.2.0",
+    "clsx": "^2.1.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "@types/react": "^18.3.0",
+    "@types/node": "^20.12.0",
+    "typescript": "^5.4.0"
+  }
+}
