@@ -63,6 +63,8 @@ function Modal({ show, title, onClose, children }: { show: boolean; title: strin
 export default function Home() {
   const { data: session, status } = useSession();
   const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [batchIndex, setBatchIndex] = useState(-1);
   const [result, setResult] = useState<string | null>(null);
   const [results, setResults] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,12 +107,17 @@ export default function Home() {
   };
 
   const onDrop = useCallback((accepted: File[]) => {
-    const f = accepted[0]; if (!f) return;
+    if (!accepted.length) return;
     setError('Compressing...');
-    resizeImg(f).then(d => { setImage(d); setResult(null); setResults([]); setError(''); }).catch(() => setError('Failed'));
+    const promises = accepted.map(f => resizeImg(f));
+    Promise.all(promises).then(dataUrls => {
+      setImages(dataUrls);
+      if (dataUrls.length === 1) setImage(dataUrls[0]);
+      setResult(null); setResults([]); setError('');
+    }).catch(() => setError('Failed'));
   }, []);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept: { 'image/*': ['.png','.jpg','.jpeg','.webp'] }, maxFiles: 1,
+    onDrop, accept: { 'image/*': ['.png','.jpg','.jpeg','.webp'] }, maxFiles: 10,
   });
 
   const generate = async (action: string, scene?: string, promptOverride?: string) => {
@@ -154,6 +161,37 @@ export default function Home() {
     const loginRes = await signIn('credentials', { email: authEmail, password: authPassword, redirect: false });
     if (loginRes?.error) { setAuthError(tr.authError); return; }
     setShowRegister(false); setAuthEmail(''); setAuthPassword(''); setAuthName('');
+  };
+
+  const processBatch = async (action: string, scene?: string) => {
+    if (!images.length) return;
+    for (let i = 0; i < images.length; i++) {
+      setImage(images[i]);
+      setBatchIndex(i);
+      await generatePromise(action, scene, customPrompt);
+    }
+    setBatchIndex(-1);
+  };
+
+  const generatePromise = (action: string, scene?: string, promptOverride?: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const origError = setError;
+      // Hook into the generate flow
+      if (action !== 'text2img' && !image) { resolve(); return; }
+      if (!loggedIn) { setShowLogin(true); resolve(); return; }
+      setLoading(true); setError(''); setResult('');
+      fetch('/api/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: images?.[batchIndex] || image, action, scene, prompt: promptOverride || '' }),
+      }).then(r => r.json()).then(data => {
+        if (!data.url) throw new Error('empty');
+        setResult(data.url); setResults(p => [data.url, ...p]);
+        fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) }).catch(() => {});
+        if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
+        setLoading(false);
+        setTimeout(resolve, 2000);
+      }).catch(() => { setLoading(false); setTimeout(resolve, 2000); });
+    });
   };
 
   const doText = () => generate('text2img', '', textPrompt);
@@ -239,7 +277,13 @@ export default function Home() {
                     <>
                       <button onClick={doWhiteBg} disabled={loading} className="w-full bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-brand-700 disabled:opacity-50 transition">
                         {loading ? '🎨 ' + tr.generating : '🪄 ' + tr.whiteBg}
-                      </button>
+                        </button>
+                      {images.length > 1 && (
+                        <button onClick={() => processBatch('whitebg')} disabled={loading}
+                          className="w-full bg-slate-800 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:bg-slate-900 disabled:opacity-50 transition">
+                          {batchIndex >= 0 ? `🔄 ${batchIndex + 1}/${images.length}` : `📦 ${images.length} 张批量白底图`}
+                        </button>
+                      )}
                       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <h3 className="text-sm font-semibold text-slate-500 mb-2">✏️ {tr.customEdit}</h3>
                         <p className="text-xs text-slate-400 mb-2">{tr.customEditDesc}</p>
