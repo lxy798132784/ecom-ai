@@ -348,13 +348,51 @@ export default function Home() {
 
         {/* Paywall */}
         <Modal show={showPay} title={'🚀 ' + tr.upgradeTitle} onClose={() => setShowPay(false)}>
-          <div className="bg-slate-50 rounded-xl p-4 mb-6">
-            <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">{tr.month}</span></div>
-            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
+          <p className="text-slate-500 text-center text-sm mb-4">{tr.upgradeDesc}</p>
+
+          {/* Credit Packs */}
+          <div className="space-y-3 mb-4">
+            <a href={process.env.NEXT_PUBLIC_LINK_5 || '#'} target="_blank" rel="noopener"
+              className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
+              <div>
+                <span className="font-semibold text-slate-800">📦 5 次</span>
+                <span className="text-xs text-slate-400 ml-2">一次性</span>
+              </div>
+              <span className="font-bold text-brand-600">$2</span>
+            </a>
+            <a href={process.env.NEXT_PUBLIC_LINK_20 || '#'} target="_blank" rel="noopener"
+              className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
+              <div>
+                <span className="font-semibold text-slate-800">📦 20 次</span>
+                <span className="text-xs text-slate-400 ml-2">一次性 · 热卖 🔥</span>
+              </div>
+              <span className="font-bold text-brand-600">$5</span>
+            </a>
+            <a href={process.env.NEXT_PUBLIC_LINK_50 || '#'} target="_blank" rel="noopener"
+              className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
+              <div>
+                <span className="font-semibold text-slate-800">📦 50 次</span>
+                <span className="text-xs text-slate-400 ml-2">一次性 · 最划算</span>
+              </div>
+              <span className="font-bold text-brand-600">$10</span>
+            </a>
           </div>
-          <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener" className="block w-full bg-brand-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-brand-700 transition">💳 {tr.upgradeBtn}</a>
-          <p className="text-xs text-slate-400 text-center mt-3">{tr.stripeSecure}</p>
-          <button onClick={() => setShowPay(false)} className="w-full mt-3 text-slate-400 text-sm hover:text-slate-600">{tr.later}</button>
+
+          {/* Monthly PRO */}
+          <div className="bg-gradient-to-br from-brand-50 to-blue-50 rounded-xl p-4 mb-4 border-2 border-brand-200">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-bold">✨ {tr.proBadge} · 月度</span>
+              <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">推荐</span>
+            </div>
+            <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">{tr.month}</span></div>
+            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}（500次/月）</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
+            <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener"
+              className="block w-full bg-brand-600 text-white text-center py-2.5 rounded-xl font-semibold hover:bg-brand-700 transition mt-3 text-sm">
+              💳 {tr.upgradeBtn}
+            </a>
+          </div>
+          <p className="text-xs text-slate-400 text-center">{tr.stripeSecure}</p>
+          <button onClick={() => setShowPay(false)} className="w-full mt-2 text-slate-400 text-sm hover:text-slate-600">{tr.later}</button>
         </Modal>
       </main>
     </>
