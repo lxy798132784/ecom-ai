@@ -14,21 +14,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { image, action, scene } = body;
+    const { image, action, scene, prompt } = body;
     if (!image) return res.status(400).json({ error: 'No image provided' });
 
     let url = '';
     if (action === 'whitebg') {
-      url = await removeBackground(image);
+      url = await removeBackground(image, prompt || '');
     } else if (action === 'scene') {
       if (!scene) return res.status(400).json({ error: 'Scene required' });
-      url = await generateLifestyleScene(image, scene);
+      url = await generateLifestyleScene(image, scene, prompt || '');
     } else {
       return res.status(400).json({ error: 'Unknown action' });
     }
 
     if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
-    console.log('Generated URL:', url);
+    console.log('Generated URL length:', url.length);
     return res.json({ url });
   } catch (e: any) {
     console.error(e);

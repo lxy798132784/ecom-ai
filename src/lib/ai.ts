@@ -16,18 +16,20 @@ function base64ToFileObject(base64: string): { file: NodeFile; filePath: string 
   return { file, filePath };
 }
 
-export async function removeBackground(imageBase64: string): Promise<string> {
+export async function removeBackground(imageBase64: string, customPrompt?: string): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
+  const extra = customPrompt ? `, ${customPrompt}` : '';
+  const fullPrompt = `Product on pure white background, professional product photography lighting, no shadows, centered, high resolution${extra}`;
   try {
     const resp = await openai.images.edit({
       model: 'gpt-image-1',
       image: file,
-      prompt: 'Product on pure white background, professional product photography lighting, no shadows, centered, high resolution',
+      prompt: fullPrompt,
       n: 1,
     });
     const data = resp.data[0];
-    console.log('removeBackground response keys:', Object.keys(data));
-    return data?.url || data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '';
+    console.log('removeBackground keys:', Object.keys(data));
+    return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
   } finally {
     fs.unlink(filePath, () => {});
   }
@@ -36,29 +38,29 @@ export async function removeBackground(imageBase64: string): Promise<string> {
 export async function generateLifestyleScene(
   imageBase64: string,
   scene: string,
+  customPrompt?: string,
 ): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
+  const extra = customPrompt ? `, ${customPrompt}` : '';
+  const sceneMap: Record<string, string> = {
+    kitchen: 'modern kitchen', 'living-room': 'cozy living room',
+    bedroom: 'elegant bedroom', office: 'clean home office desk',
+    outdoor: 'sunny outdoor garden', bathroom: 'spa bathroom',
+    marble: 'luxury marble countertop', 'wooden-table': 'rustic wooden table',
+  };
+  const sceneDesc = sceneMap[scene] || scene;
+  const fullPrompt = `Place this product in a beautiful ${sceneDesc}. Professional photography, natural lighting, product clearly visible, high resolution, realistic${extra}`;
   try {
     const resp = await openai.images.edit({
       model: 'gpt-image-1',
       image: file,
-      prompt: `Place this product in a beautiful ${scene}. Professional photography, natural lighting, product clearly visible, high resolution, realistic`,
+      prompt: fullPrompt,
       n: 1,
     });
     const data = resp.data[0];
-    console.log('generateLifestyleScene response keys:', Object.keys(data));
-    return data?.url || data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '';
+    console.log('scene generate keys:', Object.keys(data));
+    return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
   } finally {
     fs.unlink(filePath, () => {});
   }
-}
-
-export async function generateAplusImage(prompt: string): Promise<string> {
-  const resp = await openai.images.generate({
-    model: 'gpt-image-2',
-    prompt: `E-commerce product infographic, Amazon A+ content style, clean design, ${prompt}, professional, high quality`,
-    n: 1,
-    size: '1024x1024',
-  });
-  return resp.data[0]?.url || '';
 }
