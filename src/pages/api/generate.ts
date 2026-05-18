@@ -17,18 +17,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { image, action, scene } = body;
     if (!image) return res.status(400).json({ error: 'No image provided' });
 
+    let url = '';
     if (action === 'whitebg') {
-      const url = await removeBackground(image);
-      return res.json({ url });
-    }
-
-    if (action === 'scene') {
+      url = await removeBackground(image);
+    } else if (action === 'scene') {
       if (!scene) return res.status(400).json({ error: 'Scene required' });
-      const url = await generateLifestyleScene(image, scene);
-      return res.json({ url });
+      url = await generateLifestyleScene(image, scene);
+    } else {
+      return res.status(400).json({ error: 'Unknown action' });
     }
 
-    return res.status(400).json({ error: 'Unknown action' });
+    if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
+    console.log('Generated URL:', url);
+    return res.json({ url });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

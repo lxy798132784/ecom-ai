@@ -57,7 +57,7 @@ export default function Home() {
 
   const process = async (action: string, scene?: string) => {
     if (!image) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -65,7 +65,8 @@ export default function Home() {
         body: JSON.stringify({ image, action, scene }),
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!data.url) throw new Error('API 返回了空的图片地址');
       setResult(data.url);
     } catch (e: any) {
       setError(e.message);
@@ -142,6 +143,15 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div className="mt-6 bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center">
+              <div className="animate-pulse text-4xl mb-3">🎨</div>
+              <p className="text-slate-600 font-medium">AI 正在生成中...</p>
+              <p className="text-sm text-slate-400 mt-1">通常需要 5-15 秒</p>
             </div>
           )}
 
