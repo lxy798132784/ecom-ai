@@ -1,13 +1,6 @@
 // User storage: Vercel KV (production) or in-memory (fallback)
 let memoryStore: Record<string, any> = {};
 
-async function getKV() {
-  try {
-    const { kv } = await import('@vercel/kv');
-    return kv;
-  } catch { return null; }
-}
-
 interface User {
   id: string;
   email: string;
@@ -15,6 +8,21 @@ interface User {
   password: string;
   plan: string;
   createdAt: string;
+}
+
+let _kv: any = null;
+let _kvInit = false;
+
+async function getKV() {
+  if (_kvInit) return _kv;
+  _kvInit = true;
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      const mod = await import('@vercel/kv');
+      _kv = mod.kv;
+    } catch {}
+  }
+  return _kv;
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {

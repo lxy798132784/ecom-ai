@@ -39,6 +39,18 @@ const PRESETS = [
   { id: 'warm', l: '温馨暖调', p: 'warm tones, cozy, soft sunlight' },
 ];
 
+function Modal({ show, title, onClose, children }: { show: boolean; title: string; onClose: () => void; children: any }) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h2 className="text-xl font-bold text-center mb-6">{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const [image, setImage] = useState<string | null>(null);
@@ -129,18 +141,6 @@ export default function Home() {
   const doWhiteBg = () => generate('whitebg', '', customPrompt);
   const doCustom = () => generate('custom', '', customEditPrompt);
   const doScene = (sid: string) => { setSelScene(sid); generate('scene', sid, customPrompt); };
-
-  const Modal = ({ show, title, onClose, children }: any) => {
-    if (!show) return null;
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-        <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
-          <h2 className="text-xl font-bold text-center mb-6">{title}</h2>
-          {children}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <>
