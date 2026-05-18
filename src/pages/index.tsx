@@ -1,20 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
+import type { AppProps } from 'next/app';
 
 type Mode = 'upload' | 'text';
-
 const FREE_LIMIT = 5;
-const STORE = 'ecompic_user';
-
-function getUser() {
-  if (typeof window === 'undefined') return { email: '', plan: 'free', usage: 0 };
-  try { return JSON.parse(localStorage.getItem(STORE) || '{}'); }
-  catch { return { email: '', plan: 'free', usage: 0 }; }
-}
-function saveUser(u: any) { const p = getUser(); localStorage.setItem(STORE, JSON.stringify({ ...p, ...u })); }
-function getUsageLeft() { const u = getUser(); return u.plan === 'pro' ? Infinity : Math.max(0, FREE_LIMIT - (u.usage || 0)); }
-function incUsage() { const u = getUser(); saveUser({ usage: (u.usage || 0) + 1 }); }
 
 function resizeImg(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -48,6 +40,7 @@ const PRESETS = [
 ];
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [image, setImage] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [results, setResults] = useState<string[]>([]);
@@ -58,30 +51,21 @@ export default function Home() {
   const [selScene, setSelScene] = useState('');
   const [mode, setMode] = useState<Mode>('upload');
   const [textPrompt, setTextPrompt] = useState('');
-  const [usageLeft, setUsageLeft] = useState(0);
-  const [showPay, setShowPay] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-  const [userPlan, setUserPlan] = useState('free');
-  const [emailInp, setEmailInp] = useState('');
-  const [showEmail, setShowEmail] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-
-  // Custom edit
   const [customEditPrompt, setCustomEditPrompt] = useState('');
 
-  useEffect(() => { const u = getUser(); setUserEmail(u.email || ''); setUserPlan(u.plan || 'free'); setUsageLeft(getUsageLeft()); }, []);
-  const refresh = () => { setUsageLeft(getUsageLeft()); const u = getUser(); setUserPlan(u.plan || 'free'); setUserEmail(u.email || ''); };
-  const doRegister = () => {
-    if (!regEmail.trim()) return;
-    saveUser({ email: regEmail.trim(), name: regName.trim(), plan: 'free', usage: 0 });
-    setUserEmail(regEmail.trim());
-    setShowRegister(false);
-    refresh();
-  };
+  // Auth modals
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [showPay, setShowPay] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [usageCount, setUsageCount] = useState(0);
 
-  const saveEmail = () => { if (!emailInp.trim()) return; saveUser({ email: emailInp.trim() }); setUserEmail(emailInp.trim()); setShowEmail(false); refresh(); };
+  const userPlan = (session?.user as any)?.plan || 'free';
+  const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, FREE_LIMIT - usageCount);
+  const loggedIn = status === 'authenticated';
 
   const onDrop = useCallback((accepted: File[]) => {
     const f = accepted[0]; if (!f) return;
@@ -95,7 +79,8 @@ export default function Home() {
   const generate = async (action: string, scene?: string, promptOverride?: string) => {
     if (action !== 'text2img' && !image) return;
     if (action === 'text2img' && !textPrompt.trim()) { setError('请输入描述'); return; }
-    if (getUsageLeft() <= 0) { setShowPay(true); return; }
+    if (!loggedIn) { setShowLogin(true); return; }
+    if (usageLeft <= 0) { setShowPay(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
@@ -105,80 +90,107 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error('API 返回空地址');
-      setResult(data.url); setResults(p => [...p, data.url]); incUsage(); refresh();
+      setResult(data.url); setResults(p => [...p, data.url]);
+      setUsageCount(c => c + 1);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   };
+
+  const doLogin = async () => {
+    setAuthError('');
+    const res = await signIn('credentials', {
+      email: authEmail, password: authPassword, redirect: false,
+    });
+    if (res?.error) { setAuthError('邮箱或密码错误'); return; }
+    setShowLogin(false); setAuthEmail(''); setAuthPassword('');
+  };
+
+  const doRegister = async () => {
+    setAuthError('');
+    if (!authEmail.trim() || !authPassword.trim()) { setAuthError('请填写邮箱和密码'); return; }
+    if (authPassword.length < 6) { setAuthError('密码至少 6 位'); return; }
+    const res = await fetch('/api/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: authEmail, password: authPassword, name: authName }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setAuthError(data.error); return; }
+    // Auto-login after register
+    const loginRes = await signIn('credentials', {
+      email: authEmail, password: authPassword, redirect: false,
+    });
+    if (loginRes?.error) { setAuthError('注册成功但登录失败，请手动登录'); return; }
+    setShowRegister(false); setAuthEmail(''); setAuthPassword(''); setAuthName('');
+  };
+
+  const doLogout = () => { signOut(); setUsageCount(0); };
 
   const doText = () => generate('text2img', '', textPrompt);
   const doWhiteBg = () => generate('whitebg', '', customPrompt);
   const doCustom = () => generate('custom', '', customEditPrompt);
   const doScene = (sid: string) => { setSelScene(sid); generate('scene', sid, customPrompt); };
 
+  const Modal = ({ show, title, onClose, children }: any) => {
+    if (!show) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+          <h2 className="text-xl font-bold text-center mb-6">{title}</h2>
+          {children}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Head><title>EcomPic AI</title></Head>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        {/* Top bar */}
+        {/* Top Bar */}
         <div className="bg-white border-b border-slate-200">
           <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
             <span className="font-bold text-slate-800">🛍️ EcomPic AI</span>
             <div className="flex items-center gap-3 text-sm">
-              {userPlan === 'pro' ? (
-                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ PRO</span>
+              {status === 'loading' ? (
+                <span className="text-slate-400 text-xs">加载中...</span>
+              ) : loggedIn ? (
+                <>
+                  {userPlan === 'pro' ? (
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ PRO</span>
+                  ) : (
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                      剩余 {usageLeft === Infinity ? '∞' : usageLeft} 次
+                    </span>
+                  )}
+                  {userPlan !== 'pro' && (
+                    <button onClick={() => setShowPay(true)} className="bg-brand-600 text-white px-4 py-1.5 rounded-full text-xs font-medium hover:bg-brand-700">
+                      升级 PRO
+                    </button>
+                  )}
+                  <span className="text-slate-500 text-xs">{session?.user?.email}</span>
+                  <button onClick={doLogout} className="text-slate-400 hover:text-red-500 text-xs transition">退出</button>
+                </>
               ) : (
                 <>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                    免费剩余 {usageLeft} 次
-                  </span>
-                  <button onClick={() => setShowPay(true)} className="bg-brand-600 text-white px-4 py-1.5 rounded-full text-xs font-medium hover:bg-brand-700 transition">升级 PRO</button>
+                  <button onClick={() => { setShowLogin(true); setAuthError(''); }} className="text-brand-600 font-medium text-xs hover:underline">登录</button>
+                  <button onClick={() => { setShowRegister(true); setAuthError(''); }} className="bg-brand-600 text-white px-4 py-1.5 rounded-full text-xs font-medium hover:bg-brand-700">注册</button>
                 </>
               )}
-              {!userEmail && !showEmail && (<button onClick={() => setShowRegister(true)} className="text-slate-400 hover:text-slate-600 text-xs">注册</button>)}
-              {userEmail && (<span className="text-slate-400 text-xs">{userEmail}</span>)}
             </div>
           </div>
         </div>
 
-        {showRegister && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRegister(false)}>
-            <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
-              <p className="text-3xl text-center mb-2">🦐</p>
-              <h2 className="text-xl font-bold text-center mb-1">注册 EcomPic</h2>
-              <p className="text-slate-400 text-center text-sm mb-6">免费试用 5 次，无需密码</p>
-              <input value={regName} onChange={e => setRegName(e.target.value)} placeholder="昵称（选填）"
-                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-3 outline-none focus:border-brand-400" />
-              <input value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="邮箱"
-                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400" />
-              <button onClick={doRegister} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">
-                免费注册
-              </button>
-              <button onClick={() => { setShowRegister(false); setShowEmail(true); }} className="w-full mt-2 text-slate-400 text-sm hover:text-slate-600">已有账号？登录</button>
-            </div>
-          </div>
-        )}
-
-        {showEmail && (
-          <div className="max-w-md mx-auto mt-4 px-4">
-            <div className="bg-white rounded-2xl p-4 shadow border border-slate-200 flex gap-2">
-              <input value={emailInp} onChange={e => setEmailInp(e.target.value)} placeholder="输入邮箱（无需密码）" className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />
-              <button onClick={saveEmail} className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-medium">保存</button>
-              <button onClick={() => setShowEmail(false)} className="text-slate-400 text-sm px-2">取消</button>
-            </div>
-          </div>
-        )}
-
-        {/* Mode tabs */}
+        {/* Mode Tabs */}
         <div className="flex justify-center mt-8 mb-4">
           <div className="bg-slate-100 rounded-xl p-1 inline-flex">
-            <button onClick={() => setMode('upload')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>📸 上传产品图</button>
-            <button onClick={() => setMode('text')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'text' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>✍️ 文字生图</button>
+            <button onClick={() => setMode('upload')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>📸 上传产品图</button>
+            <button onClick={() => setMode('text')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'text' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>✍️ 文字生图</button>
           </div>
         </div>
 
         <div className="max-w-6xl mx-auto px-4 pb-20">
           <div className="grid md:grid-cols-5 gap-6">
-            {/* Left column */}
+            {/* Left */}
             <div className="md:col-span-2 space-y-4">
               {mode === 'upload' && (
                 <>
@@ -193,6 +205,20 @@ export default function Home() {
                       <button onClick={doWhiteBg} disabled={loading} className="w-full bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-brand-700 disabled:opacity-50 transition">
                         {loading ? '🎨 生成中...' : '🪄 一键白底图'}
                       </button>
+
+                      {/* Custom Edit */}
+                      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                        <h3 className="text-sm font-semibold text-slate-500 mb-2">✏️ 自由编辑原图</h3>
+                        <div className="flex gap-2">
+                          <input value={customEditPrompt} onChange={e => setCustomEditPrompt(e.target.value)}
+                            placeholder="换色/加效果/改风格：变成红色、加闪光..."
+                            className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />
+                          <button onClick={doCustom} disabled={loading || !customEditPrompt.trim()}
+                            className="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-900 disabled:opacity-50 transition whitespace-nowrap">🎨 生成</button>
+                        </div>
+                      </div>
+
+                      {/* Scenes */}
                       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <h3 className="text-sm font-semibold text-slate-500 mb-3">🏠 场景图</h3>
                         <div className="grid grid-cols-4 gap-2">
@@ -204,20 +230,7 @@ export default function Home() {
                           ))}
                         </div>
                       </div>
-                      {/* Custom Edit */}
-                      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mt-4">
-                        <h3 className="text-sm font-semibold text-slate-500 mb-2">✏️ 自由编辑原图</h3>
-                        <p className="text-xs text-slate-400 mb-2">在原图基础上变化：换色/加效果/改风格...</p>
-                        <div className="flex gap-2">
-                          <input value={customEditPrompt} onChange={e => setCustomEditPrompt(e.target.value)}
-                            placeholder="例如：变成红色、加上闪光、复古风格..."
-                            className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />
-                          <button onClick={doCustom} disabled={loading || !customEditPrompt.trim()}
-                            className="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-900 disabled:opacity-50 transition whitespace-nowrap">
-                            🎨 生成
-                          </button>
-                        </div>
-                      </div>
+
                       {/* Advanced */}
                       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <button onClick={() => setShowAdv(!showAdv)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 w-full">
@@ -227,12 +240,10 @@ export default function Home() {
                           <div className="mt-3 space-y-3">
                             <div className="flex flex-wrap gap-1.5">
                               {PRESETS.map(p => (
-                                <button key={p.id} onClick={() => setCustomPrompt(p.p)}
-                                  className={`text-xs px-3 py-1.5 rounded-full border transition ${customPrompt === p.p ? 'bg-brand-600 text-white border-brand-600' : 'bg-slate-100 text-slate-600 border-slate-200 hover:border-brand-400'}`}>{p.l}</button>
+                                <button key={p.id} onClick={() => setCustomPrompt(p.p)} className={`text-xs px-3 py-1.5 rounded-full border ${customPrompt === p.p ? 'bg-brand-600 text-white border-brand-600' : 'bg-slate-100 text-slate-600 border-slate-200 hover:border-brand-400'}`}>{p.l}</button>
                               ))}
                             </div>
-                            <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="自定义提示词（中英文都行）" rows={3}
-                              className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-brand-400 resize-none" />
+                            <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="自定义提示词（中英文都行）" rows={3} className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-brand-400 resize-none" />
                           </div>
                         )}
                       </div>
@@ -240,17 +251,17 @@ export default function Home() {
                   )}
                 </>
               )}
+
               {mode === 'text' && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                   <h3 className="font-semibold text-slate-700 mb-2">✍️ 描述你的产品</h3>
-                  <p className="text-xs text-slate-400 mb-4">用文字描述，AI 生成专业产品图</p>
                   <textarea value={textPrompt} onChange={e => setTextPrompt(e.target.value)}
                     placeholder="例如：白色无线耳机，大理石桌面，侧面视角，柔光..." rows={4}
                     className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-brand-400 resize-none mb-3" />
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {PRESETS.map(p => (
                       <button key={p.id} onClick={() => setTextPrompt(p.p + ' product photography, white background, studio lighting')}
-                        className="text-xs px-3 py-1.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 hover:border-brand-400 transition">{p.l}</button>
+                        className="text-xs px-3 py-1.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200 hover:border-brand-400">{p.l}</button>
                     ))}
                   </div>
                   <button onClick={doText} disabled={loading} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 disabled:opacity-50 transition">
@@ -260,12 +271,11 @@ export default function Home() {
               )}
             </div>
 
-            {/* Right column */}
+            {/* Right */}
             <div className="md:col-span-3">
               {loading && (
                 <div className="bg-white rounded-2xl p-12 shadow-sm border border-slate-200 text-center">
-                  <div className="animate-bounce text-5xl mb-4">🎨</div>
-                  <p className="text-slate-600 font-medium text-lg">AI 正在生成中...</p>
+                  <div className="animate-bounce text-5xl mb-4">🎨</div><p className="text-slate-600 font-medium text-lg">AI 正在生成中...</p>
                 </div>
               )}
               {error && (<div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm mb-4">❌ {error}</div>)}
@@ -275,7 +285,7 @@ export default function Home() {
                     <h3 className="font-semibold text-slate-700">✅ 生成完成</h3>
                     <div className="flex gap-2">
                       <button onClick={() => setResult(null)} className="text-xs text-slate-400 hover:text-slate-600">清除</button>
-                      <a href={result} download="result.png" target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800 transition">⬇️ 下载</a>
+                      <a href={result} download="result.png" target="_blank" className="text-xs bg-slate-900 text-white px-4 py-1.5 rounded-full hover:bg-slate-800">⬇️ 下载</a>
                     </div>
                   </div>
                   <img src={result} className="w-full rounded-xl shadow-md" alt="" />
@@ -303,23 +313,45 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Login Modal */}
+        <Modal show={showLogin} title="🔐 登录" onClose={() => setShowLogin(false)}>
+          {authError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4">{authError}</div>}
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="邮箱" type="email"
+            className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-3 outline-none focus:border-brand-400" />
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="密码" type="password"
+            className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400"
+            onKeyDown={e => e.key === 'Enter' && doLogin()} />
+          <button onClick={doLogin} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">登录</button>
+          <p className="text-center text-sm text-slate-400 mt-3">
+            还没有账号？ <button onClick={() => { setShowLogin(false); setShowRegister(true); }} className="text-brand-600 hover:underline">注册</button>
+          </p>
+        </Modal>
+
+        {/* Register Modal */}
+        <Modal show={showRegister} title="🦐 注册 EcomPic" onClose={() => setShowRegister(false)}>
+          {authError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4">{authError}</div>}
+          <input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="昵称（选填）"
+            className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-3 outline-none focus:border-brand-400" />
+          <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="邮箱" type="email"
+            className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-3 outline-none focus:border-brand-400" />
+          <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="密码（至少 6 位）" type="password"
+            className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400" />
+          <button onClick={doRegister} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">注册</button>
+          <p className="text-xs text-slate-400 text-center mt-3">注册即表示同意服务条款</p>
+          <p className="text-center text-sm text-slate-400 mt-2">
+            已有账号？ <button onClick={() => { setShowRegister(false); setShowLogin(true); }} className="text-brand-600 hover:underline">登录</button>
+          </p>
+        </Modal>
+
         {/* Paywall */}
-        {showPay && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowPay(false)}>
-            <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
-              <p className="text-4xl text-center mb-4">🚀</p>
-              <h2 className="text-xl font-bold text-center mb-2">升级 EcomPic PRO</h2>
-              <p className="text-slate-500 text-center text-sm mb-6">免费次数已用完</p>
-              <div className="bg-slate-50 rounded-xl p-4 mb-6">
-                <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">/月</span></div>
-                <ul className="text-sm text-slate-600 space-y-1"><li>✅ 无限次生成</li><li>✅ 所有功能</li><li>✅ 优先支持</li></ul>
-              </div>
-              <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener" className="block w-full bg-brand-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-brand-700 transition">💳 立即升级 ($19/月)</a>
-              <p className="text-xs text-slate-400 text-center mt-3">Stripe 安全处理 · 随时取消</p>
-              <button onClick={() => setShowPay(false)} className="w-full mt-3 text-slate-400 text-sm hover:text-slate-600">稍后</button>
-            </div>
+        <Modal show={showPay} title="🚀 升级 PRO" onClose={() => setShowPay(false)}>
+          <div className="bg-slate-50 rounded-xl p-4 mb-6">
+            <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">/月</span></div>
+            <ul className="text-sm text-slate-600 space-y-1"><li>✅ 无限次生成</li><li>✅ 所有功能</li><li>✅ 优先支持</li></ul>
           </div>
-        )}
+          <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener" className="block w-full bg-brand-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-brand-700 transition">💳 立即升级 ($19/月)</a>
+          <p className="text-xs text-slate-400 text-center mt-3">Stripe 安全处理 · 随时取消</p>
+        </Modal>
       </main>
     </>
   );
