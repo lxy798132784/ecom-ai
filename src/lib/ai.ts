@@ -6,8 +6,11 @@ import os from 'os';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function base64ToTempFile(base64: string): string {
+  const match = base64.match(/^data:(image\/\w+);base64,/);
+  const mime = match ? match[1] : 'image/png';
+  const ext = mime.split('/')[1] === 'jpeg' ? 'jpg' : mime.split('/')[1];
   const buf = Buffer.from(base64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const tmp = path.join(os.tmpdir(), `ecom-${Date.now()}.png`);
+  const tmp = path.join(os.tmpdir(), `ecom-${Date.now()}.${ext}`);
   fs.writeFileSync(tmp, buf);
   return tmp;
 }
