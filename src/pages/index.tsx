@@ -194,7 +194,7 @@ export default function Home() {
         {status !== 'loading' && !loggedIn && (
           <div className="max-w-lg mx-auto mt-4 px-4">
             <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5 text-center">
-              <p className="text-sm text-brand-700 mb-2">🔐 登录后即可使用 AI 生图</p>
+              <p className="text-sm text-brand-700 mb-2">🔐 {tr.loginRequired}</p>
               <div className="flex justify-center gap-3">
                 <button onClick={() => { setShowLogin(true); setAuthError(''); }} className="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-brand-700">{tr.login}</button>
                 <button onClick={() => { setShowRegister(true); setAuthError(''); }} className="bg-white text-brand-600 border border-brand-300 px-5 py-2 rounded-xl text-sm font-medium hover:bg-brand-50">{tr.register}</button>
@@ -368,24 +368,24 @@ export default function Home() {
             <a href={process.env.NEXT_PUBLIC_LINK_5 || '#'} target="_blank" rel="noopener"
               className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
               <div>
-                <span className="font-semibold text-slate-800">📦 5 次</span>
-                <span className="text-xs text-slate-400 ml-2">一次性</span>
+                <span className="font-semibold text-slate-800">📦 {tr.pack5}</span>
+                <span className="text-xs text-slate-400 ml-2">{tr.oneTime}</span>
               </div>
               <span className="font-bold text-brand-600">$2</span>
             </a>
             <a href={process.env.NEXT_PUBLIC_LINK_20 || '#'} target="_blank" rel="noopener"
               className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
               <div>
-                <span className="font-semibold text-slate-800">📦 20 次</span>
-                <span className="text-xs text-slate-400 ml-2">一次性 · 热卖 🔥</span>
+                <span className="font-semibold text-slate-800">📦 {tr.pack20}</span>
+                <span className="text-xs text-slate-400 ml-2">{tr.hotDeal} 🔥</span>
               </div>
               <span className="font-bold text-brand-600">$5</span>
             </a>
             <a href={process.env.NEXT_PUBLIC_LINK_50 || '#'} target="_blank" rel="noopener"
               className="flex items-center justify-between bg-white border-2 border-slate-200 hover:border-brand-400 rounded-xl p-3 transition">
               <div>
-                <span className="font-semibold text-slate-800">📦 50 次</span>
-                <span className="text-xs text-slate-400 ml-2">一次性 · 最划算</span>
+                <span className="font-semibold text-slate-800">📦 {tr.pack50}</span>
+                <span className="text-xs text-slate-400 ml-2">{tr.bestValue}</span>
               </div>
               <span className="font-bold text-brand-600">$10</span>
             </a>
@@ -394,8 +394,8 @@ export default function Home() {
           {/* Monthly PRO */}
           <div className="bg-gradient-to-br from-brand-50 to-blue-50 rounded-xl p-4 mb-4 border-2 border-brand-200">
             <div className="flex justify-between items-center mb-2">
-              <span className="font-bold">✨ {tr.proBadge} · 月度</span>
-              <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">推荐</span>
+              <span className="font-bold">✨ {tr.proBadge} · {tr.monthly}</span>
+              <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">{tr.recommended}</span>
             </div>
             <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">{tr.month}</span></div>
             <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}（500次/月）</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
