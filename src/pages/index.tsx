@@ -34,12 +34,14 @@ const SCENES = [
 ];
 
 const PRESET_PROMPTS = [
-  { id: 'whitebg', label: '纯白背景', prompt: 'Product on pure white background, professional product photography lighting, no shadows, centered' },
-  { id: 'lifestyle', label: '生活场景', prompt: 'Product in a beautiful lifestyle setting, natural light, realistic' },
-  { id: 'minimal', label: '极简风格', prompt: 'Minimalist product photography, clean composition, soft shadows, aesthetic' },
-  { id: 'studio', label: '影棚质感', prompt: 'Studio lighting product shot, dramatic lighting, high-end commercial photography' },
-  { id: 'flatlay', label: '平铺展示', prompt: 'Flat lay product photography, top-down view, neatly arranged, bright' },
-  { id: 'closeup', label: '细节特写', prompt: 'Close-up macro product shot, detailed texture visible, depth of field, premium' },
+  { id: 'whitebg', label: '纯白背景', prompt: 'white background, product photography, clean' },
+  { id: 'lifestyle', label: '生活场景', prompt: 'lifestyle setting, natural light, warm atmosphere' },
+  { id: 'minimal', label: '极简风格', prompt: 'minimalist, clean composition, soft shadows, aesthetic' },
+  { id: 'studio', label: '影棚质感', prompt: 'studio lighting, high-end commercial photography, dramatic' },
+  { id: 'flatlay', label: '平铺展示', prompt: 'flat lay, top-down view, neatly arranged, bright' },
+  { id: 'closeup', label: '细节特写', prompt: 'close-up macro shot, detailed texture, depth of field, premium quality' },
+  { id: 'chinese', label: '国潮风格', prompt: 'Chinese traditional aesthetic, elegant, red and gold accents, cultural' },
+  { id: 'warm', label: '温馨暖调', prompt: 'warm tones, cozy atmosphere, soft sunlight, homey feel' },
 ];
 
 export default function Home() {
@@ -191,12 +193,12 @@ export default function Home() {
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 font-medium mb-1 block">
-                            自定义提示词 <span className="text-slate-300">（英文效果更好）</span>
+                            自定义提示词 <span className="text-slate-400">（支持中英文，英文效果更佳）</span>
                           </label>
                           <textarea
                             value={customPrompt}
                             onChange={(e) => setCustomPrompt(e.target.value)}
-                            placeholder="输入你想要的画面描述，例如：白色大理石背景，柔光，高端商务风格..."
+                            placeholder="中英文都行，例如：白色大理石背景、柔光、高端商务风格..."
                             rows={3}
                             className="w-full text-sm border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-brand-400 resize-none"
                           />
