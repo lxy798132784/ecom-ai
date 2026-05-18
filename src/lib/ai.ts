@@ -28,7 +28,6 @@ export async function removeBackground(imageBase64: string, customPrompt?: strin
       n: 1,
     });
     const data = resp.data[0];
-    console.log('removeBackground keys:', Object.keys(data));
     return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
   } finally {
     fs.unlink(filePath, () => {});
@@ -36,9 +35,7 @@ export async function removeBackground(imageBase64: string, customPrompt?: strin
 }
 
 export async function generateLifestyleScene(
-  imageBase64: string,
-  scene: string,
-  customPrompt?: string,
+  imageBase64: string, scene: string, customPrompt?: string,
 ): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
   const extra = customPrompt ? `, ${customPrompt}` : '';
@@ -48,8 +45,7 @@ export async function generateLifestyleScene(
     outdoor: 'sunny outdoor garden', bathroom: 'spa bathroom',
     marble: 'luxury marble countertop', 'wooden-table': 'rustic wooden table',
   };
-  const sceneDesc = sceneMap[scene] || scene;
-  const fullPrompt = `Place this product in a beautiful ${sceneDesc}. Professional photography, natural lighting, product clearly visible, high resolution, realistic${extra}`;
+  const fullPrompt = `Place this product in a beautiful ${sceneMap[scene] || scene}. Professional photography, natural lighting, product clearly visible, high resolution, realistic${extra}`;
   try {
     const resp = await openai.images.edit({
       model: 'gpt-image-1',
@@ -58,7 +54,6 @@ export async function generateLifestyleScene(
       n: 1,
     });
     const data = resp.data[0];
-    console.log('scene generate keys:', Object.keys(data));
     return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
   } finally {
     fs.unlink(filePath, () => {});
