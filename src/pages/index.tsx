@@ -67,6 +67,9 @@ export default function Home() {
   const [batchIndex, setBatchIndex] = useState(-1);
   const [result, setResult] = useState<string | null>(null);
   const [results, setResults] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [selectedResults, setSelectedResults] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<'history'|'favorites'>('history');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
@@ -99,12 +102,15 @@ export default function Home() {
   const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
 
-  // Load history & credits on login
+  // Load history, favorites & credits on login
   useEffect(() => {
     if (!loggedIn) return;
     fetch('/api/history').then(r => r.json()).then(d => {
       if (d.history) setResults(d.history);
       if (d.credits !== undefined) setCredits(d.credits);
+    }).catch(() => {});
+    fetch('/api/favorites').then(r => r.json()).then(d => {
+      if (d.favorites) setFavorites(d.favorites);
     }).catch(() => {});
   }, [loggedIn]);
 
@@ -422,11 +428,34 @@ export default function Home() {
               )}
               {results.filter((_, i) => i > 0).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-500 mb-3">📋 {tr.history} ({results.length})</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-slate-500">
+                      <button onClick={() => setViewMode('history')} className={`mr-3 ${viewMode==='history'?'text-brand-600 underline':''}`}>📋 {tr.history} ({results.length})</button>
+                      <button onClick={() => setViewMode('favorites')} className={`${viewMode==='favorites'?'text-brand-600 underline':''}`}>⭐ {tr.favorites} ({favorites.length})</button>
+                    </h3>
+                    {viewMode==='history' && selectedResults.size > 0 && (
+                      <button onClick={() => {
+                        selectedResults.forEach(i => {
+                          const a = document.createElement('a'); a.href = results[i]; a.download = `ecompic-${Date.now()}-${i}.jpg`; a.click();
+                        });
+                        setSelectedResults(new Set());
+                      }} className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full">⬇️ {tr.downloadSelected} ({selectedResults.size})</button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
-                    {results.filter((_, i) => i > 0).map((url, i) => (
-                      <div key={i} className="bg-white rounded-xl p-2 shadow-sm border border-slate-200 cursor-pointer hover:border-brand-400" onClick={() => setResult(url)}>
-                        <img src={url} className="w-full rounded-lg" alt="" />
+                    {(viewMode==='history' ? results.filter((_, i) => i > 0) : favorites).map((url, i) => (
+                      <div key={i} className="relative">
+                        <div className={`bg-white rounded-xl p-2 shadow-sm border-2 cursor-pointer hover:border-brand-400 ${selectedResults.has(i) ? 'border-brand-500' : 'border-slate-200'}`} onClick={() => {
+                          if (viewMode==='history') { const s = new Set(selectedResults); s.has(i) ? s.delete(i) : s.add(i); setSelectedResults(s); } else { setResult(url); }
+                        }}>
+                          <img src={url} className="w-full rounded-lg" alt="" />
+                        </div>
+                        <button onClick={(e) => {
+                          e.stopPropagation();
+                          fetch('/api/favorites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) })
+                            .then(r => r.json()).then(d => { if (d.favorites) setFavorites(d.favorites); });
+                        }} className="absolute top-1 right-1 text-sm bg-white/80 rounded-full w-6 h-6 flex items-center justify-center">{favorites.includes(url) ? '⭐' : '☆'}</button>
+                        {viewMode==='history' && selectedResults.has(i) && <div className="absolute top-1 left-1 text-xs bg-brand-500 text-white rounded-full w-5 h-5 flex items-center justify-center">✓</div>}
                       </div>
                     ))}
                   </div>
