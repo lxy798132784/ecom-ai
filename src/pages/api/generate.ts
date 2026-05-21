@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
-import { removeBackground, generateLifestyleScene, generateProductImage, customEdit } from '../../lib/ai';
-import { generateProductImageZhipu } from '../../lib/ai';
+import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneration, dispatchBatch } from '../../lib/ai';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -43,28 +42,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { image, action, scene, prompt } = body;
+    const { image, action, scene, prompt, model: preferredModel, batch } = body;
 
-    if (action === 'text2img') {
-      // Text-to-image doesn't need uploaded image
-    } else if (!image) {
+    if (action !== 'text2img' && !image) {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    // Check usage
     const usageCheck = await checkAndIncrement(token.email!, plan);
     if (!usageCheck.allowed) {
       return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage });
     }
 
     let url = '';
+    let meta: any = {};
+
     if (action === 'text2img') {
-      // Try Zhipu first (cheaper, domestic), fallback to OpenAI
       const textPrompt = body.prompt || body.text || scene || 'product photo';
-      url = await generateProductImageZhipu(textPrompt);
-      if (!url) {
-        url = await generateProductImage(textPrompt);
-      }
+      // 调度器：自动选择最佳模型（成本优先）
+      const result = batch 
+        ? await dispatchBatch(textPrompt)    // 并行抢答，最快者胜
+        : await dispatchGeneration(textPrompt, preferredModel as any);
+      url = result.url;
+      meta = { provider: result.provider, model: result.model, cost: result.cost };
     } else if (action === 'custom') {
       url = await customEdit(image, prompt || body.customPrompt || 'enhance this product photo');
     } else if (action === 'whitebg') {
@@ -77,14 +76,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
-    
-    // Auto-save to user history
+
+    // 自动保存到用户历史
     try {
       await kv.lpush(`history:${token.email}`, url);
       await kv.ltrim(`history:${token.email}`, 0, 19);
     } catch {}
-    
-    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit });
+
+    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });
