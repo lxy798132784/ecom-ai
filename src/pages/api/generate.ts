@@ -136,6 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!storedUrl) return res.status(500).json({ error: 'Image storage failed' });
 
     // 自动保存到用户历史：先去重再置顶，避免前端刷新或重复写入出现两张相同历史图。
+    let savedHistory: string[] = [];
     try {
       const targetId = imageId(storedUrl);
       await Promise.all(historyOwnerKeys.flatMap(owner => [
@@ -148,6 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await kv.lpush(historyKey, storedUrl);
         await kv.ltrim(historyKey, 0, 99);
       }));
+      savedHistory = Array.from(new Set((await kv.lrange(`history:${email}`, 0, 99).catch(() => [] as string[])).map(x => String(x || '')).filter(Boolean)));
     } catch (e: any) {
       console.error('history write failed', e);
       return res.status(500).json({ error: '历史图片保存失败，请稍后重试；本次不会重复扣积分' });
@@ -155,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const charged = await chargeAfterSuccess(email, usageCheck);
 
-    return res.json({ url: storedUrl, usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, storedImage: storedUrl !== url, ...meta });
+    return res.json({ url: storedUrl, history: savedHistory, historySaved: savedHistory.some(x => imageId(x) === imageId(storedUrl)), usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, storedImage: storedUrl !== url, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

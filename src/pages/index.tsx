@@ -230,7 +230,9 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error(tr.apiEmptyUrl);
-      setResult(data.url); setResults(p => prependUnique(p, data.url));
+      setResult(data.url);
+      if (data.history) setResults(uniqueImages(data.history));
+      else setResults(p => prependUnique(p, data.url));
       if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
       if (data.limit !== undefined) setUsageLimit(data.limit);
       if (data.plan === 'pro' && data.proUsage !== undefined) setUsageCount(data.proUsage);
@@ -296,7 +298,9 @@ export default function Home() {
         body: JSON.stringify({ image: images?.[batchIndex] || image, action, scene, prompt: promptOverride || '', quality: genQuality, size: genSize }),
       }).then(r => r.json()).then(data => {
         if (!data.url) throw new Error('empty');
-        setResult(data.url); setResults(p => prependUnique(p, data.url));
+        setResult(data.url);
+        if (data.history) setResults(uniqueImages(data.history));
+        else setResults(p => prependUnique(p, data.url));
         if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
         if (data.limit !== undefined) setUsageLimit(data.limit);
         if (data.plan === 'pro' && data.proUsage !== undefined) setUsageCount(data.proUsage);

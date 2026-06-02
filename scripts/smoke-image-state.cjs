@@ -81,7 +81,7 @@ async function call(handler, method, body = {}, query = {}) { const res = mockRe
   const url = gen.body.url;
 
   const h1 = await call(history, 'GET');
-  if (!h1.body.history.includes(url)) throw new Error(`history missing generated URL after refresh: ${JSON.stringify(h1.body)}`);
+  if (!h1.body.history.includes(url) || !gen.body.history?.includes(url) || gen.body.historySaved !== true) throw new Error(`history missing generated URL after refresh: ${JSON.stringify({ gen: gen.body, history: h1.body })}`);
 
   const fav = await call(favorites, 'POST', { url });
   if (fav.statusCode !== 200 || !fav.body.favorites.includes(url)) throw new Error(`favorite add failed: ${JSON.stringify(fav.body)}`);
