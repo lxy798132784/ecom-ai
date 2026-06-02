@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { kv } from '@vercel/kv';
+import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../lib/adminAuth';
 import { normalizeEmail } from '../../../lib/users';
 
@@ -9,6 +10,8 @@ interface StoredUser {
   name?: string;
   plan?: string;
   createdAt?: string;
+  hasPassword?: boolean;
+  passwordHashPreview?: string;
 }
 
 function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7)) {
@@ -16,12 +19,15 @@ function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7)
 }
 
 function sanitizeUser(user: any, fallbackEmail: string): StoredUser {
+  const passwordHash = String(user?.password || '');
   return {
     id: user?.id || '',
     email: normalizeEmail(user?.email || fallbackEmail),
     name: user?.name || '',
     plan: user?.plan || 'free',
     createdAt: user?.createdAt || '',
+    hasPassword: Boolean(passwordHash),
+    passwordHashPreview: passwordHash ? `${passwordHash.slice(0, 7)}…${passwordHash.slice(-6)}` : '',
   };
 }
 
@@ -68,6 +74,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const nextUser = { ...existing, email };
     if (body.plan === 'free' || body.plan === 'pro') nextUser.plan = body.plan;
     if (typeof body.name === 'string') nextUser.name = body.name;
+    if (typeof body.newPassword === 'string' && body.newPassword.length > 0) {
+      if (body.newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
+      nextUser.password = await bcrypt.hash(body.newPassword, 10);
+    }
     await kv.hset('users', { [email]: nextUser });
 
     if (body.credits !== undefined) {

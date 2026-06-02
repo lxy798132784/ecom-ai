@@ -9,6 +9,9 @@ type AdminUser = {
   createdAt?: string;
   usage: number;
   credits: number;
+  hasPassword?: boolean;
+  passwordHashPreview?: string;
+  newPassword?: string;
   historyCountPreview?: number;
   favoritesCountPreview?: number;
 };
@@ -83,10 +86,11 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/users?month=${encodeURIComponent(month)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, plan: next.plan, credits: next.credits, usage: next.usage, name: next.name }),
+        body: JSON.stringify({ email: user.email, plan: next.plan, credits: next.credits, usage: next.usage, name: next.name, newPassword: next.newPassword || '' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '保存失败');
+      setUsers(prev => prev.map(u => u.email === user.email ? { ...next, newPassword: '', hasPassword: true, passwordHashPreview: next.newPassword ? '已重置' : next.passwordHashPreview } : u));
       setMessage(`已保存 ${user.email}`);
     } catch (e: any) {
       setError(e.message || '保存失败');
@@ -139,15 +143,22 @@ export default function AdminPage() {
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">用户</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月使用</th><th className="text-left p-3">赠送次数</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">账号 / 昵称</th><th className="text-left p-3">密码</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月使用</th><th className="text-left p-3">剩余免费</th><th className="text-left p-3">赠送次数</th><th className="text-left p-3">作品</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
               <tbody>
                 {filtered.map(u => <tr key={u.email} className="border-t border-slate-100">
                   <td className="p-3"><div className="font-medium text-slate-800">{u.email}</div><input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} className="mt-1 w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs" /></td>
+                  <td className="p-3">
+                    <div className="text-[11px] text-slate-400 mb-1">明文不可查看，只能重置</div>
+                    <input type="password" value={u.newPassword || ''} placeholder="输入新密码" onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
+                    <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || '已保存'}` : '未设置密码'}</div>
+                  </td>
                   <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
                   <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
+                  <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.plan === 'pro' ? '∞' : Math.max(0, 5 - Number(u.usage || 0))}</span></td>
                   <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
+                  <td className="p-3 text-xs text-slate-500">历史 {u.historyCountPreview || 0}<br/>收藏 {u.favoritesCountPreview || 0}</td>
                   <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
-                  <td className="p-3"><button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">保存</button></td>
+                  <td className="p-3"><button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">保存全部</button></td>
                 </tr>)}
               </tbody>
             </table>
