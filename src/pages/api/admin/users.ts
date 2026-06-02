@@ -45,16 +45,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const [usage, credits, history, favorites] = await Promise.all([
         kv.get<number>(getUsageKey(email, month)).catch(() => 0),
         kv.get<number>(`credits:${email}`).catch(() => 0),
-        kv.lrange(`history:${email}`, 0, 4).catch(() => []),
-        kv.lrange(`favorites:${email}`, 0, 4).catch(() => []),
+        kv.lrange(`history:${email}`, 0, 99).catch(() => []),
+        kv.lrange(`fav:${email}`, 0, 99).catch(() => []),
       ]);
       return {
         ...user,
         email,
         usage: usage || 0,
         credits: credits || 0,
-        historyCountPreview: Array.isArray(history) ? history.length : 0,
-        favoritesCountPreview: Array.isArray(favorites) ? favorites.length : 0,
+        history: Array.from(new Set((history || []).filter(Boolean))),
+        favorites: Array.from(new Set((favorites || []).filter(Boolean))),
+        historyCountPreview: Array.isArray(history) ? Array.from(new Set(history.filter(Boolean))).length : 0,
+        favoritesCountPreview: Array.isArray(favorites) ? Array.from(new Set(favorites.filter(Boolean))).length : 0,
       };
     }));
 

@@ -116,6 +116,8 @@ export default function Home() {
     fetch('/api/history').then(r => r.json()).then(d => {
       if (d.history) setResults(uniqueImages(d.history));
       if (d.credits !== undefined) setCredits(d.credits);
+      if (d.usage !== undefined) setUsageCount(d.usage);
+      if (d.limit !== undefined) setUsageLimit(d.limit);
     }).catch(() => {});
     fetch('/api/favorites').then(r => r.json()).then(d => {
       if (d.favorites) setFavorites(d.favorites);
@@ -170,7 +172,7 @@ export default function Home() {
     if (action !== 'text2img' && !image) return;
     if (action === 'text2img' && !textPrompt.trim()) { setError(tr.pleaseFill); return; }
     if (!loggedIn) { setShowLogin(true); return; }
-    if (usageLeft <= 0 && userPlan !== 'pro') { setShowPay(true); return; }
+    if (usageLeft <= 0 && credits <= 0 && userPlan !== 'pro') { setShowPay(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
@@ -182,7 +184,6 @@ export default function Home() {
       if (!data.url) throw new Error('API returned empty URL');
       setResult(data.url); setResults(p => prependUnique(p, data.url));
       if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
-        if (data.credits !== undefined) setCredits(data.credits);
       if (data.credits !== undefined) setCredits(data.credits);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -245,6 +246,7 @@ export default function Home() {
         if (!data.url) throw new Error('empty');
         setResult(data.url); setResults(p => prependUnique(p, data.url));
         if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
+        if (data.credits !== undefined) setCredits(data.credits);
         setLoading(false);
         setTimeout(resolve, 2000);
       }).catch(() => { setLoading(false); setTimeout(resolve, 2000); });
@@ -279,7 +281,11 @@ export default function Home() {
     setResults(p => p.filter(x => x !== url));
     setSelectedResults(p => { const next = new Set(p); next.delete(url); return next; });
     if (result === url) setResult(null);
-    await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).catch(() => {});
+    try {
+      const res = await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const data = await res.json().catch(() => ({}));
+      if (data.history) setResults(uniqueImages(data.history));
+    } catch {}
   };
 
   return (

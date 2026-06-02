@@ -1,12 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
+import { normalizeEmail } from '../../lib/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req });
   if (!token?.email) return res.status(401).json({ error: '请先登录' });
 
-  const key = `fav:${token.email}`;
+  const email = normalizeEmail(String(token.email));
+  const key = `fav:${email}`;
 
   if (req.method === 'GET') {
     const favs = (await kv.lrange(key, 0, 99)) || [];

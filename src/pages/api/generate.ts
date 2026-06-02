@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
 import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneration, dispatchBatch } from '../../lib/ai';
+import { normalizeEmail, findUserByEmail } from '../../lib/users';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -48,7 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const token = await getToken({ req });
   if (!token?.email) return res.status(401).json({ error: '请先登录' });
-  const plan = (token.plan as string) || 'free';
+  const email = normalizeEmail(String(token.email));
+  const user = await findUserByEmail(email).catch(() => undefined);
+  const plan = user?.plan || (token.plan as string) || 'free';
 
   let body: any;
   try {
@@ -64,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    const usageCheck = await checkAndIncrement(token.email!, plan);
+    const usageCheck = await checkAndIncrement(email, plan);
     if (!usageCheck.allowed) {
       return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage, credits: usageCheck.credits });
     }
@@ -94,10 +97,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 自动保存到用户历史：先去重再置顶，避免前端刷新或重复写入出现两张相同历史图。
     try {
-      const historyKey = `history:${token.email}`;
+      const historyKey = `history:${email}`;
       await kv.lrem(historyKey, 0, url);
       await kv.lpush(historyKey, url);
-      await kv.ltrim(historyKey, 0, 19);
+      await kv.ltrim(historyKey, 0, 99);
     } catch {}
 
     return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, credits: usageCheck.credits, paidWith: usageCheck.paidWith, ...meta });

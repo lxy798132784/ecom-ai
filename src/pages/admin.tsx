@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Fragment } from 'react';
 
 type AdminUser = {
   id?: string;
@@ -12,6 +12,8 @@ type AdminUser = {
   hasPassword?: boolean;
   passwordHashPreview?: string;
   newPassword?: string;
+  history?: string[];
+  favorites?: string[];
   historyCountPreview?: number;
   favoritesCountPreview?: number;
 };
@@ -31,6 +33,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [expandedEmail, setExpandedEmail] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -145,21 +148,38 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">账号 / 昵称</th><th className="text-left p-3">密码</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月使用</th><th className="text-left p-3">剩余免费</th><th className="text-left p-3">赠送次数</th><th className="text-left p-3">作品</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
               <tbody>
-                {filtered.map(u => <tr key={u.email} className="border-t border-slate-100">
-                  <td className="p-3"><div className="font-medium text-slate-800">{u.email}</div><input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} className="mt-1 w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs" /></td>
-                  <td className="p-3">
-                    <div className="text-[11px] text-slate-400 mb-1">明文不可查看，只能重置</div>
-                    <input type="password" value={u.newPassword || ''} placeholder="输入新密码" onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
-                    <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || '已保存'}` : '未设置密码'}</div>
-                  </td>
-                  <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
-                  <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
-                  <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.plan === 'pro' ? '∞' : Math.max(0, 5 - Number(u.usage || 0))}</span></td>
-                  <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
-                  <td className="p-3 text-xs text-slate-500">历史 {u.historyCountPreview || 0}<br/>收藏 {u.favoritesCountPreview || 0}</td>
-                  <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
-                  <td className="p-3"><button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">保存全部</button></td>
-                </tr>)}
+                {filtered.map(u => <Fragment key={u.email}>
+                  <tr className="border-t border-slate-100">
+                    <td className="p-3"><div className="font-medium text-slate-800">{u.email}</div><input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} className="mt-1 w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs" /></td>
+                    <td className="p-3">
+                      <div className="text-[11px] text-slate-400 mb-1">明文不可查看，只能重置</div>
+                      <input type="password" value={u.newPassword || ''} placeholder="输入新密码" onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
+                      <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || '已保存'}` : '未设置密码'}</div>
+                    </td>
+                    <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
+                    <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
+                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.plan === 'pro' ? '∞' : Math.max(0, 5 - Number(u.usage || 0))}</span></td>
+                    <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
+                    <td className="p-3 text-xs text-slate-500">历史 {u.history?.length || 0}<br/>收藏 {u.favorites?.length || 0}</td>
+                    <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
+                    <td className="p-3 space-y-2">
+                      <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">保存全部</button>
+                      <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? '收起图片' : '查看图片'}</button>
+                    </td>
+                  </tr>
+                  {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={9} className="p-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">历史图片 ({u.history?.length || 0})</h4>
+                        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">{(u.history || []).map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="block rounded-lg border border-slate-200 bg-white p-1 hover:border-brand-400"><img src={url} className="aspect-square w-full object-cover rounded" alt="history" /></a>)}</div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">收藏图片 ({u.favorites?.length || 0})</h4>
+                        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">{(u.favorites || []).map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="block rounded-lg border border-slate-200 bg-white p-1 hover:border-brand-400"><img src={url} className="aspect-square w-full object-cover rounded" alt="favorite" /></a>)}</div>
+                      </div>
+                    </div>
+                  </td></tr>}
+                </Fragment>)}
               </tbody>
             </table>
           </div>
