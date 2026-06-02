@@ -29,6 +29,19 @@ async function imageDeletePayload(url: string) {
 }
 
 
+async function downloadOne(url: string, fileName = 'ecompic-image.jpg') {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
 function resizeImg(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -70,10 +83,15 @@ const QUALITY_OPTIONS = [
   { id: 'high', label: '高', mult: 4 },
 ] as const;
 const SIZE_OPTIONS = [
-  { id: '1024x1024', label: '1024×1024', mult: 1 },
-  { id: '1920x1080', label: '1920×1080', mult: 2 },
-  { id: '2560x1440', label: '2560×1440', mult: 3 },
-  { id: '3840x2160', label: '3840×2160', mult: 5 },
+  { id: '1024x1024', label: '1:1 · 1024×1024', mult: 1 },
+  { id: '1280x720', label: '16:9 · 1280×720', mult: 1 },
+  { id: '720x1280', label: '9:16 · 720×1280', mult: 1 },
+  { id: '1920x1080', label: '16:9 · 1920×1080', mult: 2 },
+  { id: '1080x1920', label: '9:16 · 1080×1920', mult: 2 },
+  { id: '2048x2048', label: '1:1 · 2048×2048', mult: 2 },
+  { id: '2560x1440', label: '16:9 · 2560×1440', mult: 3 },
+  { id: '1440x2560', label: '9:16 · 1440×2560', mult: 3 },
+  { id: '3840x2160', label: '16:9 · 3840×2160', mult: 5 },
 ] as const;
 function calcPoints(quality: string, size: string) {
   return (QUALITY_OPTIONS.find(x => x.id === quality)?.mult || 2) * (SIZE_OPTIONS.find(x => x.id === size)?.mult || 1);
@@ -129,7 +147,7 @@ export default function Home() {
   const [fitMode, setFitMode] = useState<'fill'|'fit'>('fill');
   const [bgColor, setBgColor] = useState('#ffffff');
   const [genQuality, setGenQuality] = useState<'low'|'medium'|'high'>('medium');
-  const [genSize, setGenSize] = useState<'1024x1024'|'1920x1080'|'2560x1440'|'3840x2160'>('1024x1024');
+  const [genSize, setGenSize] = useState<typeof SIZE_OPTIONS[number]['id']>('1024x1024');
   const tr = t[lang];
   const downloadUrl = resizedUrl || result;
   const userPlan = accountPlan || (session?.user as any)?.plan || 'free';
@@ -433,7 +451,7 @@ export default function Home() {
                     <p className="text-xs text-slate-400 mb-1">分辨率</p>
                     <div className="grid grid-cols-2 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-xs ${genSize===sz.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{sz.label} ×{sz.mult}</button>)}</div>
                   </div>
-                  <p className="text-[11px] text-slate-400">不同质量和分辨率按倍率消耗积分；16:9 高清会按所选分辨率输出。</p>
+                  <p className="text-[11px] text-slate-400">吸收 gpt_image_playground 的尺寸思路：支持 1:1 / 16:9 / 9:16，多档位先低成本试稿，成功后再扣积分。</p>
                 </div>
               </div>
               {mode === 'upload' && (
@@ -564,10 +582,8 @@ export default function Home() {
                     <div className="flex items-center justify-between bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 mb-3">
                       <span className="text-xs text-brand-700">已选择 {selectedResults.size} 张</span>
                       <div className="flex gap-2">
-                        <button onClick={() => {
-                          selectedResults.forEach(url => {
-                            const a = document.createElement('a'); a.href = url; a.download = `ecompic-${Date.now()}.jpg`; a.click();
-                          });
+                        <button onClick={async () => {
+                          await Promise.all(Array.from(selectedResults).map((url, idx) => downloadOne(url, `ecompic-${idx + 1}.jpg`)));
                           setSelectedResults(new Set());
                         }} className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full">⬇️ {tr.downloadSelected}</button>
                         <button onClick={() => selectedResults.forEach(url => deleteHistoryImage(url))} className="text-xs bg-red-500 text-white px-3 py-1 rounded-full">🗑️ 删除</button>

@@ -33,6 +33,16 @@ function userAliasKeys(usersHash: Record<string, any>, email: string, rawEmail =
   ].filter(Boolean)));
 }
 
+async function listKeysByOwner(prefixes: string[], ownerEmail: string, baseKeys: string[]) {
+  const normalizedOwner = normalizeEmail(ownerEmail);
+  const discovered = await Promise.all(prefixes.map(prefix =>
+    (kv.keys(`${prefix}:*`).catch(() => []) as Promise<string[]>).then(keys =>
+      keys.filter(key => normalizeEmail(String(key).slice(prefix.length + 1)) === normalizedOwner)
+    )
+  ));
+  return Array.from(new Set([...baseKeys, ...discovered.flat()]));
+}
+
 async function deletedImageSets(email: string, kind: 'history' | 'fav') {
   const urlKeys = kind === 'history' ? [`deleted:history:${email}`] : [`deleted:fav:${email}`, `deleted:favorites:${email}`];
   const idKeys = kind === 'history' ? [`deleted:history-id:${email}`] : [`deleted:fav-id:${email}`, `deleted:favorites-id:${email}`];
@@ -43,18 +53,19 @@ async function deletedImageSets(email: string, kind: 'history' | 'fav') {
   return { urls: new Set(urls), ids: new Set(ids) };
 }
 
-function filterDeletedImages(items: unknown[], deleted: { urls: Set<string>; ids: Set<string> }) {
-  return cleanList(items).filter(url => !deleted.urls.has(url) && !deleted.ids.has(imageId(url))).slice(0, 100);
+function filterDeletedImages(items: unknown[], _deleted: { urls: Set<string>; ids: Set<string> }) {
+  // Visibility first: do not let stale tombstones hide valid user/admin images.
+  // Admin/user DELETE removes entries from all discovered history/favorite keys.
+  return cleanList(items).slice(0, 100);
 }
 
-function imageKeys(email: string, kind: 'history' | 'favorites') {
-  return kind === 'history'
-    ? [`history:${email}`]
-    : [`fav:${email}`, `favorites:${email}`];
+async function imageKeys(email: string, kind: 'history' | 'favorites') {
+  const base = kind === 'history' ? [`history:${email}`] : [`fav:${email}`, `favorites:${email}`];
+  return listKeysByOwner(kind === 'history' ? ['history'] : ['fav', 'favorites'], email, base);
 }
 
 async function deleteImageEverywhere(email: string, kind: 'history' | 'favorites', url: string, id?: string) {
-  const keys = imageKeys(email, kind);
+  const keys = await imageKeys(email, kind);
   const targetId = id || imageId(url);
   await Promise.all(keys.map(async key => {
     const items = cleanList(await kv.lrange(key, 0, -1).catch(() => []));
@@ -101,8 +112,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         kv.get<number>(getUsageKey(email, month, 'free')).catch(() => 0),
         kv.get<number>(getUsageKey(email, month, 'pro')).catch(() => 0),
         kv.get<number>(`credits:${email}`).catch(() => 0),
-        Promise.all(aliases.map(e => kv.lrange(`history:${e}`, 0, 199).catch(() => []))).then(parts => parts.flat()),
-        Promise.all(aliases.flatMap(e => [`fav:${e}`, `favorites:${e}`]).map(k => kv.lrange(k, 0, 199).catch(() => []))).then(parts => parts.flat()),
+        listKeysByOwner(['history'], email, aliases.map(e => `history:${e}`)).then(keys => Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => []))).then(parts => parts.flat())),
+        listKeysByOwner(['fav', 'favorites'], email, aliases.flatMap(e => [`fav:${e}`, `favorites:${e}`])).then(keys => Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => []))).then(parts => parts.flat())),
         deletedImageSets(email, 'history'),
         deletedImageSets(email, 'fav'),
       ]);

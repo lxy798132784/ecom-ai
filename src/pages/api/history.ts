@@ -37,8 +37,20 @@ async function getDeleted(keys: string[]): Promise<{ urls: Set<string>; ids: Set
   return { urls: new Set(urls), ids: new Set(ids) };
 }
 
-function filterDeleted(items: string[], deleted: { urls: Set<string>; ids: Set<string> }) {
-  return cleanList(items).filter(url => !deleted.urls.has(url) && !deleted.ids.has(imageId(url))).slice(0, 100);
+async function listKeysByOwner(prefixes: string[], ownerEmail: string, baseKeys: string[]) {
+  const normalizedOwner = normalizeEmail(ownerEmail);
+  const discovered = await Promise.all(prefixes.map(prefix =>
+    (kv.keys(`${prefix}:*`).catch(() => []) as Promise<string[]>).then(keys =>
+      keys.filter(key => normalizeEmail(String(key).slice(prefix.length + 1)) === normalizedOwner)
+    )
+  ));
+  return Array.from(new Set([...baseKeys, ...discovered.flat()]));
+}
+
+function filterDeleted(items: string[], _deleted: { urls: Set<string>; ids: Set<string> }) {
+  // Visibility first: earlier URL/ID tombstones accidentally hid valid legacy images.
+  // DELETE now removes entries from every discovered key, so list views should show stored images.
+  return cleanList(items).slice(0, 100);
 }
 
 function usageKey(email: string, bucket: 'free' | 'pro', month = currentMonth()) {
@@ -58,7 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const usersHash = (await kv.hgetall<Record<string, any>>('users').catch(() => ({}))) || {};
   const aliasKeys = Object.keys(usersHash).filter(k => normalizeEmail(k) === email || normalizeEmail(usersHash[k]?.email || '') === email);
   const emailKeys = Array.from(new Set([email, rawEmail, ...aliasKeys]));
-  const historyKeys = emailKeys.map(e => `history:${e}`);
+  const baseHistoryKeys = emailKeys.map(e => `history:${e}`);
+  const historyKeys = await listKeysByOwner(['history'], email, baseHistoryKeys);
   const key = `history:${email}`;
 
   if (req.method === 'GET') {

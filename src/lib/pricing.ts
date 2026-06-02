@@ -1,5 +1,5 @@
 export type ImageQuality = 'low' | 'medium' | 'high';
-export type ImageSizeKey = '1024x1024' | '1920x1080' | '2560x1440' | '3840x2160';
+export type ImageSizeKey = '1024x1024' | '1280x720' | '720x1280' | '1920x1080' | '1080x1920' | '2048x2048' | '2560x1440' | '1440x2560' | '3840x2160';
 
 export const QUALITY_MULTIPLIER: Record<ImageQuality, number> = {
   low: 1,
@@ -9,8 +9,13 @@ export const QUALITY_MULTIPLIER: Record<ImageQuality, number> = {
 
 export const SIZE_MULTIPLIER: Record<ImageSizeKey, number> = {
   '1024x1024': 1,
+  '1280x720': 1,
+  '720x1280': 1,
   '1920x1080': 2,
+  '1080x1920': 2,
+  '2048x2048': 2,
   '2560x1440': 3,
+  '1440x2560': 3,
   '3840x2160': 5,
 };
 
@@ -23,7 +28,9 @@ export function normalizeQuality(input: any): ImageQuality {
 }
 
 export function normalizeSize(input: any): ImageSizeKey {
-  return input === '1920x1080' || input === '2560x1440' || input === '3840x2160' ? input : '1024x1024';
+  return input === '1280x720' || input === '720x1280' || input === '1920x1080' || input === '1080x1920' || input === '2048x2048' || input === '2560x1440' || input === '1440x2560' || input === '3840x2160'
+    ? input
+    : '1024x1024';
 }
 
 export function calcImagePoints(qualityInput: any, sizeInput: any): number {
