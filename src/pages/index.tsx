@@ -247,6 +247,15 @@ export default function Home() {
   const removeReference = (url: string) => { const next = references.filter(x => x !== url); setReferences(next); setSelectedRefUrls(prev => prev.filter(x => x !== url)); if (activeRef === url) setActiveRef(next[0] || ''); };
   const clearReferences = () => { setReferences([]); setActiveRef(''); setSelectedRefUrls([]); };
   const applyPromptTemplate = (text: string) => { if (mode === 'text' || mode === 'agent') setPrompt(text); else setCustomPrompt(text); };
+  const currentPromptValue = mode === 'text' || mode === 'agent' ? prompt : customPrompt;
+  const setCurrentPromptValue = (value: string) => { if (mode === 'text' || mode === 'agent') setPrompt(value); else setCustomPrompt(value); };
+  const appendPromptStyle = (text: string) => setCurrentPromptValue([currentPromptValue.trim(), text].filter(Boolean).join(', '));
+  const enhancePrompt = () => {
+    const base = currentPromptValue.trim();
+    if (!base) { setCurrentPromptValue(tr.promptEnhanceSeed); return; }
+    if (base.includes(tr.promptEnhanceSuffix)) return;
+    setCurrentPromptValue(`${base}, ${tr.promptEnhanceSuffix}`);
+  };
 
   const submit = async () => {
     if (!loggedIn) { setShowLogin(true); return; }
@@ -325,13 +334,35 @@ export default function Home() {
         <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(94,106,210,.28),transparent_34%),rgba(255,255,255,.03)] p-6 shadow-2xl md:p-8">
           <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
             <div><p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-brand-300">{tr.studioHeroKicker}</p><h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-50 md:text-5xl">{tr.studioHeroTitle}</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400 md:text-base">{tr.studioHeroDesc}</p></div>
-            <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              {mediaTools.map(tool => <Link key={tool.key} href={withResult(tool.href)} className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 hover:border-brand-400/60"><div className="flex items-center justify-between"><span className="text-2xl">{tool.icon}</span><span className={`rounded-full px-2 py-1 ${tool.ready ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>{tool.ready ? tr.configured : tr.pendingConfig}</span></div><div className="mt-3 font-semibold text-slate-100">{tool.label}</div><div className="mt-1 line-clamp-2 text-slate-500">{tool.desc}</div></Link>)}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {[
+                  ['⚡', tr.learnRealtimeTitle, tr.learnRealtimeDesc],
+                  ['🧩', tr.learnCanvasTitle, tr.learnCanvasDesc],
+                  ['✨', tr.learnPromptTitle, tr.learnPromptDesc],
+                  ['🎛️', tr.learnPresetTitle, tr.learnPresetDesc],
+                ].map(card => <div key={card[1]} className="rounded-2xl border border-white/10 bg-black/20 p-3"><div className="text-xl">{card[0]}</div><div className="mt-2 font-semibold text-slate-100">{card[1]}</div><div className="mt-1 text-[11px] leading-4 text-slate-500">{card[2]}</div></div>)}
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                {mediaTools.map(tool => <Link key={tool.key} href={withResult(tool.href)} className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 hover:border-brand-400/60"><div className="flex items-center justify-between"><span className="text-2xl">{tool.icon}</span><span className={`rounded-full px-2 py-1 ${tool.ready ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>{tool.ready ? tr.configured : tr.pendingConfig}</span></div><div className="mt-3 font-semibold text-slate-100">{tool.label}</div><div className="mt-1 line-clamp-2 text-slate-500">{tool.desc}</div></Link>)}
+              </div>
             </div>
           </div>
         </div>
       </section>
       {!loggedIn && <div className="mx-auto mt-4 max-w-3xl px-4"><div className="rounded-2xl border border-brand-500/30 bg-brand-500/10 p-4 text-center text-sm">🔐 {tr.loginRequired}</div></div>}
+
+      <section className="mx-auto max-w-7xl px-4 pt-5">
+        <div className="grid gap-2 rounded-3xl border border-white/[0.08] bg-white/[0.025] p-2 text-xs md:grid-cols-5">
+          {[
+            ['01', tr.workflowPrompt, '#create'],
+            ['02', tr.workflowReference, '#references'],
+            ['03', tr.workflowSpecs, '#specs'],
+            ['04', tr.workflowGenerate, '#create'],
+            ['05', tr.workflowReuse, '#gallery'],
+          ].map(step => <a key={step[0]} href={step[2]} className="group rounded-2xl border border-white/[0.06] bg-[#08090a] p-3 transition hover:border-brand-400/50 hover:bg-white/[0.04]"><div className="font-mono text-[10px] text-brand-300">{step[0]}</div><div className="mt-1 font-semibold text-slate-200 group-hover:text-white">{step[1]}</div></a>)}
+        </div>
+      </section>
 
       <div className="mx-auto max-w-7xl px-4 py-5">
         <section id="create" className="sticky top-[72px] z-20 rounded-[28px] border border-white/[0.08] bg-[#0f1011]/95 p-3 shadow-2xl shadow-black/30 backdrop-blur md:p-4">
@@ -342,9 +373,13 @@ export default function Home() {
             <div className="min-w-0">
               {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={3} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" />}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <button onClick={enhancePrompt} className="rounded-full border border-brand-400/40 bg-brand-500/10 px-2.5 py-1 font-semibold text-brand-100 hover:bg-brand-500/20">✨ {tr.enhancePrompt}</button>
                 <button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateCinematic}</button>
                 <button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templatePortrait}</button>
                 <button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateProduct}</button>
+                <button onClick={() => appendPromptStyle(tr.stylePhotorealPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.stylePhotoreal}</button>
+                <button onClick={() => appendPromptStyle(tr.styleDesignPosterPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleDesignPoster}</button>
+                <button onClick={() => appendPromptStyle(tr.styleMinimalPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleMinimal}</button>
                 {mode === 'scene' && SCENES.slice(0, 4).map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-full border px-2.5 py-1 ${scene === s.id ? 'border-brand-400 bg-brand-500/20 text-brand-100' : 'border-white/10 text-slate-400 hover:text-white'}`}>{s.e} {lang === 'zh' ? s.zh : s.en}</button>)}
               </div>
               {mode === 'mask' && <div className="mt-2 rounded-xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">🎭 {tr.maskModeHint}</div>}
@@ -401,7 +436,7 @@ export default function Home() {
           <div className="min-h-[520px] rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
             {loading && <div className="flex min-h-[480px] flex-col items-center justify-center text-center"><div className="mb-3 animate-bounce text-5xl">🎨</div><div>{tr.generating}</div><div className="mt-1 text-xs text-slate-500">{tr.waitSeconds}</div></div>}
             {!loading && result && <div><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-bold">✅ {tr.done}</h2><div className="flex flex-wrap gap-2 text-xs"><button onClick={() => addReferenceFromGallery(result)} className="rounded-full bg-white/10 px-3 py-1 hover:bg-white/15">{tr.useAsReference}</button><button onClick={() => toggleFavorite(result)} className="rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-200">{favoriteUrls.includes(result) ? tr.unfavorite : tr.favorite}</button><button onClick={() => downloadAs(result, outputFormat, 'image-studio-result')} className="rounded-full bg-slate-100 px-3 py-1 text-slate-900">⬇️ {tr.download}</button><button onClick={() => setResult(null)} className="text-slate-400 hover:text-white">{tr.clear}</button></div></div><img src={result} className="max-h-[760px] w-full rounded-2xl bg-[#08090a] object-contain" alt="" /></div>}
-            {!loading && !result && <div className="flex min-h-[480px] flex-col items-center justify-center p-12 text-center text-slate-500"><div className="mb-4 text-7xl">🧠</div><div className="font-medium text-slate-300">{tr.emptyStudioTitle}</div><div className="mt-2 max-w-md text-sm leading-6">{tr.emptyStudioDesc}</div></div>}
+            {!loading && !result && <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center text-slate-500"><div className="mb-4 text-7xl">🧠</div><div className="font-medium text-slate-300">{tr.emptyStudioTitle}</div><div className="mt-2 max-w-md text-sm leading-6">{tr.emptyStudioDesc}</div><div className="mt-6 grid w-full max-w-2xl gap-2 text-left text-xs sm:grid-cols-3"><button onClick={() => { setMode('text'); applyPromptTemplate(tr.templateCinematicPrompt); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">✨</div><div className="mt-2 font-semibold text-slate-200">{tr.quickTextStart}</div><p className="mt-1 text-slate-500">{tr.quickTextStartDesc}</p></button><button onClick={() => { setMode('edit'); document.getElementById('references')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🖼️</div><div className="mt-2 font-semibold text-slate-200">{tr.quickRefStart}</div><p className="mt-1 text-slate-500">{tr.quickRefStartDesc}</p></button><button onClick={() => { setMode('agent'); setPrompt(tr.agentPromptSeed); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🤖</div><div className="mt-2 font-semibold text-slate-200">{tr.quickAgentStart}</div><p className="mt-1 text-slate-500">{tr.quickAgentStartDesc}</p></button></div></div>}
           </div>
 
           <div id="gallery" className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
