@@ -20,6 +20,7 @@ export type ImageSizeKey = '1024x1024' | '1280x720' | '720x1280' | '1920x1080' |
 export interface ImageGenerationOptions {
   quality?: ImageQuality;
   size?: ImageSizeKey;
+  outputFormat?: 'png' | 'jpeg' | 'webp';
 }
 
 const SIZE_MAP: Record<ImageSizeKey, { width: number; height: number; apiSize: '1024x1024' | '1536x1024' | '1024x1536' }> = {
@@ -54,6 +55,15 @@ async function resizeOutput(url: string, options?: ImageGenerationOptions): Prom
       ? Buffer.from(url.replace(/^data:image\/\w+;base64,/, ''), 'base64')
       : Buffer.from(await (await fetch(url)).arrayBuffer());
     const jpegQuality = quality === 'low' ? 78 : quality === 'high' ? 94 : 88;
+    const requestedFormat = options?.outputFormat === 'webp' ? 'webp' : options?.outputFormat === 'png' ? 'png' : 'jpeg';
+    if (requestedFormat === 'png') {
+      const out = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' }).png().toBuffer();
+      return `data:image/png;base64,${out.toString('base64')}`;
+    }
+    if (requestedFormat === 'webp') {
+      const out = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' }).webp({ quality: jpegQuality }).toBuffer();
+      return `data:image/webp;base64,${out.toString('base64')}`;
+    }
     const out = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' }).jpeg({ quality: jpegQuality }).toBuffer();
     return `data:image/jpeg;base64,${out.toString('base64')}`;
   } catch {

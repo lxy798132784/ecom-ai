@@ -3,6 +3,27 @@ import crypto from 'crypto';
 
 const CHUNK_SIZE = 180_000;
 const MAX_IMAGE_BYTES = 18 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 20_000;
+
+async function fetchImageAsDataUrl(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const contentType = resp.headers.get('content-type') || 'image/png';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      throw new Error(`Not an image: ${contentType}`);
+    }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.byteLength > MAX_IMAGE_BYTES) {
+      throw new Error('生成图片过大，无法安全保存，请降低分辨率后重试');
+    }
+    return `data:${contentType.split(';')[0]};base64,${buf.toString('base64')}`;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function imageIdFromUrl(url: string) {
   const canonical = String(url || '').trim().split('#')[0].split('?')[0];
@@ -27,9 +48,15 @@ export function canonicalImageId(url: string) {
 }
 
 export async function persistGeneratedImage(url: string): Promise<string> {
-  const value = String(url || '');
+  let value = String(url || '');
   if (!value) return '';
-  if (!value.startsWith('data:image/')) return value;
+  if (!value.startsWith('data:image/')) {
+    if (/^https?:\/\//i.test(value)) {
+      value = await fetchImageAsDataUrl(value);
+    } else {
+      return value;
+    }
+  }
 
   const bytes = Buffer.byteLength(value, 'utf8');
   if (bytes > MAX_IMAGE_BYTES) {

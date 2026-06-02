@@ -35,7 +35,7 @@ const kv = {
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
   if (request === '@vercel/kv') return { kv };
-  if (request === 'next-auth/jwt') return { getToken: async () => ({ email: 'Test@Example.com', plan: 'free' }) };
+  if (request === 'next-auth/jwt') return { getToken: async () => ({ email: global.__TEST_EMAIL__ || 'Test@Example.com', plan: 'free' }) };
   if (request.endsWith('../../lib/ai') || request.endsWith('../../../lib/ai')) return {
     dispatchGeneration: async () => ({ url: `data:image/png;base64,${Buffer.from('fake-image').toString('base64')}`, provider: 'openai', model: 'test', cost: 0 }),
     dispatchBatch: async () => ({ url: `data:image/png;base64,${Buffer.from('fake-image').toString('base64')}`, provider: 'openai', model: 'test', cost: 0 }),
@@ -82,12 +82,22 @@ async function call(handler, method, body = {}, query = {}) { const res = mockRe
 
   const h1 = await call(history, 'GET');
   if (!h1.body.history.includes(url) || !gen.body.history?.includes(url) || gen.body.historySaved !== true) throw new Error(`history missing generated URL after refresh: ${JSON.stringify({ gen: gen.body, history: h1.body })}`);
+  if (!h1.body.items?.[0]?.id || h1.body.items[0].url !== url) throw new Error(`history item metadata missing: ${JSON.stringify(h1.body)}`);
 
-  const fav = await call(favorites, 'POST', { url });
+  global.__TEST_EMAIL__ = 'test@example.com';
+  const hSameAccountLowerCase = await call(history, 'GET');
+  if (!hSameAccountLowerCase.body.history.includes(url)) throw new Error(`same account different session/device missing history: ${JSON.stringify(hSameAccountLowerCase.body)}`);
+  global.__TEST_EMAIL__ = 'Test@Example.com';
+
+  const fav = await call(favorites, 'POST', { url, source: 'manual-favorite' });
   if (fav.statusCode !== 200 || !fav.body.favorites.includes(url)) throw new Error(`favorite add failed: ${JSON.stringify(fav.body)}`);
 
   const f1 = await call(favorites, 'GET');
-  if (!f1.body.favorites.includes(url)) throw new Error(`favorites missing after refresh: ${JSON.stringify(f1.body)}`);
+  if (!f1.body.favorites.includes(url) || !f1.body.items?.[0]?.id) throw new Error(`favorites missing after refresh: ${JSON.stringify(f1.body)}`);
+  global.__TEST_EMAIL__ = 'test@example.com';
+  const fSameAccountLowerCase = await call(favorites, 'GET');
+  if (!fSameAccountLowerCase.body.favorites.includes(url)) throw new Error(`same account different session/device missing favorites: ${JSON.stringify(fSameAccountLowerCase.body)}`);
+  global.__TEST_EMAIL__ = 'Test@Example.com';
 
   const admin = await call(adminUsers, 'GET', {}, { month: new Date().toISOString().slice(0, 7) });
   const row = admin.body.users.find(u => u.email === email);
