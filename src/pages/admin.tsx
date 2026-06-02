@@ -135,8 +135,8 @@ export default function AdminPage() {
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">用户数</p><p className="text-2xl font-bold">{users.length}</p></div>
           <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">PRO</p><p className="text-2xl font-bold">{users.filter(u => u.plan === 'pro').length}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">本月生成</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">赠送次数</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p></div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">本月积分消耗</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p></div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">积分余额</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p></div>
         </section>
 
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -148,7 +148,7 @@ export default function AdminPage() {
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">账号 / 昵称</th><th className="text-left p-3">密码</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月使用</th><th className="text-left p-3">剩余次数</th><th className="text-left p-3">赠送次数</th><th className="text-left p-3">作品</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">账号 / 昵称</th><th className="text-left p-3">密码</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月消耗</th><th className="text-left p-3">剩余积分</th><th className="text-left p-3">积分余额</th><th className="text-left p-3">作品</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
               <tbody>
                 {filtered.map(u => <Fragment key={u.email}>
                   <tr className="border-t border-slate-100">
@@ -159,8 +159,8 @@ export default function AdminPage() {
                       <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || '已保存'}` : '未设置密码'}</div>
                     </td>
                     <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
-                    <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} · pro {u.proUsage || 0}</div></td>
-                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 1000 : 5) - Number(u.usage || 0))}</span></td>
+                    <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} 积分 · pro {u.proUsage || 0} 积分</div></td>
+                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
                     <td className="p-3 text-xs text-slate-500">历史 {u.history?.length || 0}<br/>收藏 {u.favorites?.length || 0}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>

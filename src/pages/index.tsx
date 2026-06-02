@@ -20,6 +20,14 @@ function prependUnique(items: string[], url: string): string[] {
   return [url, ...items.filter(x => x !== url)].slice(0, 20);
 }
 
+async function imageDeletePayload(url: string) {
+  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
+  const bytes = new TextEncoder().encode(canonical || String(url || ''));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const id = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return { id, url: url.startsWith('data:') || url.length > 2000 ? undefined : url };
+}
+
 
 function resizeImg(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -194,7 +202,7 @@ export default function Home() {
     if (action !== 'text2img' && !image) return;
     if (action === 'text2img' && !textPrompt.trim()) { setError(tr.pleaseFill); return; }
     if (!loggedIn) { setShowLogin(true); return; }
-    if (usageLeft <= 0 && credits <= 0) { userPlan === 'pro' ? setError('PRO 本月 1000 张额度已用完') : setShowPay(true); return; }
+    if (usageLeft < pointsCost && credits < pointsCost) { userPlan === 'pro' ? setError('PRO 本月积分不足') : setShowPay(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
@@ -308,24 +316,35 @@ export default function Home() {
   };
 
   const deleteHistoryImage = async (url: string) => {
+    const prev = results;
     setResults(p => p.filter(x => x !== url));
     setSelectedResults(p => { const next = new Set(p); next.delete(url); return next; });
     if (result === url) setResult(null);
     try {
-      const res = await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const payload = await imageDeletePayload(url);
+      const res = await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || '删除失败');
       if (data.history) setResults(uniqueImages(data.history));
-    } catch {}
+    } catch (e: any) {
+      setResults(prev);
+      setError(e?.message || '删除历史图片失败，请重试');
+    }
   };
 
-
   const deleteFavoriteImage = async (url: string) => {
+    const prev = favorites;
     setFavorites(p => p.filter(x => x !== url));
     try {
-      const res = await fetch('/api/favorites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const payload = await imageDeletePayload(url);
+      const res = await fetch('/api/favorites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || '删除失败');
       if (data.favorites) setFavorites(uniqueImages(data.favorites));
-    } catch {}
+    } catch (e: any) {
+      setFavorites(prev);
+      setError(e?.message || '删除收藏图片失败，请重试');
+    }
   };
 
   return (
@@ -340,7 +359,7 @@ export default function Home() {
         <div className="bg-white border-b border-slate-200">
           <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
             <span className="font-bold text-slate-800">🛍️ {tr.brand}</span>
-            {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} 次</span>)}
+            {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} 积分</span>)}
             <div className="flex items-center gap-3 text-sm">
               <a href="/blog" className="text-xs text-slate-500 hover:text-brand-600 transition">📚 Blog</a>
               {/* Lang toggle */}
@@ -355,7 +374,7 @@ export default function Home() {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge} · {tr.freeLeft} {usageLeft} {tr.times}</span>
                   ) : (
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                      {tr.freeLeft} {usageLeft} {tr.times}{credits > 0 ? ` · 升级包 ${credits} 张` : ''}
+                      {tr.freeLeft} {usageLeft} {tr.times}{credits > 0 ? ` · 积分包 ${credits} 积分` : ''}
                     </span>
                   )}
                   {userPlan !== 'pro' && (
@@ -403,18 +422,18 @@ export default function Home() {
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-slate-600">⚙️ 生成规格</h3>
-                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded-full">本次消耗 {pointsCost} 积分</span>
+                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded-full">预计消耗 {pointsCost} 积分</span>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">质量倍率</p>
+                    <p className="text-xs text-slate-400 mb-1">质量</p>
                     <div className="grid grid-cols-3 gap-2">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality===q.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{q.label} ×{q.mult}</button>)}</div>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">分辨率倍率</p>
+                    <p className="text-xs text-slate-400 mb-1">分辨率</p>
                     <div className="grid grid-cols-2 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-xs ${genSize===sz.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{sz.label} ×{sz.mult}</button>)}</div>
                   </div>
-                  <p className="text-[11px] text-slate-400">gpt-image-2 原生支持 quality/size；16:9 高清会先用最接近原生比例生成，再按所选分辨率高清输出。</p>
+                  <p className="text-[11px] text-slate-400">不同质量和分辨率按倍率消耗积分；16:9 高清会按所选分辨率输出。</p>
                 </div>
               </div>
               {mode === 'upload' && (
@@ -683,7 +702,7 @@ export default function Home() {
               <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">{tr.recommended}</span>
             </div>
             <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">{tr.month}</span></div>
-            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}（1000次/月）</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
+            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
             <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener"
               className="block w-full bg-brand-600 text-white text-center py-2.5 rounded-xl font-semibold hover:bg-brand-700 transition mt-3 text-sm">
               💳 {tr.upgradeBtn}

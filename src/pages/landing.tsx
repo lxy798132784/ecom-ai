@@ -17,7 +17,7 @@ export default function Landing() {
             <Link href="/" className="bg-white text-brand-700 px-8 py-3 rounded-xl font-bold text-lg hover:bg-blue-50 transition shadow-lg">🪄 免费试用</Link>
             <a href="#pricing" className="border-2 border-white/30 text-white px-8 py-3 rounded-xl font-bold text-lg hover:bg-white/10 transition">查看定价</a>
           </div>
-          <p className="text-blue-200/60 text-sm mt-4">免费 5 次 · 无需信用卡</p>
+          <p className="text-blue-200/60 text-sm mt-4">免费 10 积分 · 无需信用卡</p>
         </section>
 
         {/* Before / After */}
@@ -45,7 +45,7 @@ export default function Landing() {
             <div className="grid md:grid-cols-2 gap-6">
               {[
                 { t: '⚡ 秒级出图', d: '拖拽上传，AI 5-15 秒生成，比等设计师快 100 倍' },
-                { t: '💰 省 90% 成本', d: '美工一张图 $10，AI 只要 $0.04，月付 $19 无限用' },
+                { t: '💰 省 90% 成本', d: '按质量/分辨率消耗积分，低清小图更省，高质量大图更灵活' },
                 { t: '🌐 中英双语', d: '自动生成英文 Listing 文案，出海无障碍' },
                 { t: '🔄 场景百变', d: '8 种场景一键切换，厨房/客厅/办公桌/户外' },
                 { t: '📐 多平台适配', d: 'Amazon / eBay / Shopify / Temu 尺寸自动裁' },
@@ -66,10 +66,10 @@ export default function Landing() {
           <p className="text-slate-500 text-center mb-12">先免费试用，满意再升级</p>
           <div className="grid md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             {[
-              { name: '免费', price: '$0', desc: '5 次/月', features: ['5 次生成', '全部功能', '云端历史'], cta: '免费开始', href: '/', primary: false },
-              { name: '5 次包', price: '$2', desc: '一次性', features: ['5 次生成', '永远有效', '即买即用'], cta: '购买', href: '#', primary: false },
-              { name: '20 次包 🔥', price: '$5', desc: '一次性', features: ['20 次生成', '省 30%', '热卖推荐'], cta: '购买', href: '#', primary: true },
-              { name: 'PRO', price: '$19', desc: '/月', features: ['500 次/月', '全部功能', '优先支持', '未来新功能'], cta: '升级 PRO', href: '#', primary: false },
+              { name: '免费', price: '$0', desc: '10 积分/月', features: ['10 免费积分', '全部功能', '云端历史'], cta: '免费开始', href: '/', primary: false },
+              { name: '50 积分包', price: '$2', desc: '一次性', features: ['50 积分', '永远有效', '即买即用'], cta: '购买', href: '#', primary: false },
+              { name: '200 积分包 🔥', price: '$5', desc: '一次性', features: ['200 积分', '省 30%', '热卖推荐'], cta: '购买', href: '#', primary: true },
+              { name: 'PRO', price: '$19', desc: '/月', features: ['2000 积分/月', '全部功能', '优先支持', '未来新功能'], cta: '升级 PRO', href: '#', primary: false },
             ].map((p, i) => (
               <div key={i} className={`rounded-2xl p-6 text-center ${p.primary ? 'bg-brand-600 text-white ring-4 ring-brand-200 scale-105' : 'bg-white border border-slate-200'}`}>
                 <h3 className={`font-bold text-lg mb-1 ${p.primary ? 'text-white' : 'text-slate-800'}`}>{p.name}</h3>
@@ -107,7 +107,7 @@ export default function Landing() {
         {/* CTA */}
         <section className="py-20 text-center bg-gradient-to-br from-brand-600 to-brand-700 text-white px-4">
           <h2 className="text-3xl font-bold mb-4">准备好让你的产品图脱颖而出？</h2>
-          <p className="text-lg text-blue-100 mb-8">免费试用 5 次，不用绑定信用卡</p>
+          <p className="text-lg text-blue-100 mb-8">免费试用 10 积分，不用绑定信用卡</p>
           <Link href="/" className="bg-white text-brand-700 px-10 py-4 rounded-xl font-bold text-xl hover:bg-blue-50 transition shadow-lg inline-block">🪄 开始免费试用</Link>
         </section>
 

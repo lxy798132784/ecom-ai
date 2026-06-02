@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
 import crypto from 'crypto';
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
+
 import { normalizeEmail } from '../../lib/users';
 
 function cleanList(items: unknown[]): string[] {
@@ -84,19 +86,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'DELETE') {
-    const { url } = req.body || {};
-    if (!url) return res.status(400).json({ error: '缺少url' });
-    const target = String(url);
-    const targetId = imageId(target);
+    const { url, id } = req.body || {};
+    if (!url && !id) return res.status(400).json({ error: '缺少图片ID' });
+    const target = url ? String(url) : '';
+    const targetId = String(id || imageId(target));
     await Promise.all([
       ...keys.map(async k => {
         const list = cleanList(await kv.lrange(k, 0, 199).catch(() => []));
-        await replaceList(k, list.filter(x => x !== target && imageId(x) !== targetId));
+        await replaceList(k, list.filter(x => (target ? x !== target : true) && imageId(x) !== targetId));
       }),
       ...emailKeys.flatMap(e => [
-        kv.sadd(`deleted:fav:${e}`, target).catch(() => 0),
+        ...(target ? [kv.sadd(`deleted:fav:${e}`, target).catch(() => 0), kv.sadd(`deleted:favorites:${e}`, target).catch(() => 0)] : []),
         kv.sadd(`deleted:fav-id:${e}`, targetId).catch(() => 0),
-        kv.sadd(`deleted:favorites:${e}`, target).catch(() => 0),
         kv.sadd(`deleted:favorites-id:${e}`, targetId).catch(() => 0),
       ]),
     ]);
