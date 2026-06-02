@@ -426,10 +426,10 @@ export default function Home() {
         )}
 
         <div className="max-w-6xl mx-auto px-4 mt-6">
-          <div className="grid md:grid-cols-3 gap-3">
-            <a href="/video" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🎬</div><div className="font-bold text-slate-900">AI 生视频</div><div className="text-xs text-slate-500 mt-1">商品图转广告短视频，独立页面配置参数。</div></a>
-            <a href="/audio" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🎙️</div><div className="font-bold text-slate-900">AI 生语音</div><div className="text-xs text-slate-500 mt-1">商品文案转广告旁白，独立页面配置参数。</div></a>
-            <a href="/voice-clone" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🗣️</div><div className="font-bold text-slate-900">音色克隆</div><div className="text-xs text-slate-500 mt-1">上传参考音频生成品牌配音。</div></a>
+          <div className="grid md:grid-cols-3 gap-4">
+            <a href="/video" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎬</div><div className="font-bold text-slate-900">AI 生视频</div><div className="text-xs text-slate-500 mt-1 leading-5">商品图转广告短视频，独立页面配置参数。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
+            <a href="/audio" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎙️</div><div className="font-bold text-slate-900">AI 生语音</div><div className="text-xs text-slate-500 mt-1 leading-5">商品文案转广告旁白，独立页面配置参数。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
+            <a href="/voice-clone" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🗣️</div><div className="font-bold text-slate-900">音色克隆</div><div className="text-xs text-slate-500 mt-1 leading-5">上传参考音频生成品牌配音。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
           </div>
         </div>
 
@@ -580,7 +580,7 @@ export default function Home() {
                   <div className="flex items-center justify-between mb-3 gap-3">
                     <div>
                       <h3 className="text-sm font-semibold text-slate-700">作品库</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">参考 Firefly / Canva / Midjourney：历史图可复用、再编辑、收藏、删除。</p>
+                      <p className="text-xs text-slate-400 mt-0.5">历史作品可复用、再编辑、收藏和删除，方便连续产出。</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setViewMode('history')} className={`text-xs px-3 py-1.5 rounded-full border ${viewMode==='history'?'bg-brand-600 text-white border-brand-600':'bg-white text-slate-500 border-slate-200 hover:border-brand-300'}`}>📋 {tr.history} ({results.length})</button>

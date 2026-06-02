@@ -32,7 +32,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
-      className="fixed bottom-4 right-4 z-50 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-xl backdrop-blur hover:bg-white theme-toggle"
+      className="fixed bottom-4 right-4 z-50 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-xs font-semibold text-slate-700 shadow-xl backdrop-blur hover:bg-white theme-toggle md:right-6"
     >
       {theme === 'dark' ? '☀️ 浅色' : '🌙 深色'}
     </button>

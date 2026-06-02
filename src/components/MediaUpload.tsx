@@ -37,19 +37,21 @@ export function MediaUpload({ label, description, accept, value, onChange, previ
 
   return (
     <div>
-      <div className="mb-2">
+      <div className="mb-3">
         <div className="text-sm font-bold text-slate-800">{label}</div>
-        <div className="text-xs text-slate-500 mt-1">{description}</div>
+        <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
       </div>
-      <div {...getRootProps()} className={`rounded-2xl border-2 border-dashed p-5 cursor-pointer transition ${isDragActive ? 'border-brand-500 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-brand-400'}`}>
+      <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-5 transition ${isDragActive ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-slate-50 hover:border-brand-400'}`}>
         <input {...getInputProps()} />
-        <div className="text-center">
-          <div className="text-3xl mb-2">{preview === 'audio' ? '🎧' : '🖼️'}</div>
-          <p className="text-sm font-semibold text-slate-700">{busy ? '读取中...' : isDragActive ? '松开上传' : '点击或拖拽上传'}</p>
-          <p className="text-xs text-slate-400 mt-1">{name || '上传后会作为当前功能的参考素材'}</p>
+        <div className="flex min-h-[104px] items-center justify-center text-center">
+          <div>
+            <div className="mb-2 text-3xl">{preview === 'audio' ? '🎧' : '🖼️'}</div>
+            <p className="text-sm font-semibold text-slate-700">{busy ? '读取中...' : isDragActive ? '松开上传' : '点击或拖拽上传'}</p>
+            <p className="mt-1 text-xs text-slate-400">{name || '上传后会作为当前功能的参考素材'}</p>
+          </div>
         </div>
       </div>
-      {value && preview === 'image' && <img src={value} alt="reference" className="mt-3 max-h-56 rounded-2xl border border-slate-200 object-contain bg-white" />}
+      {value && preview === 'image' && <img src={value} alt="reference" className="mt-3 max-h-64 w-full rounded-2xl border border-slate-200 bg-white object-contain p-2" />}
       {value && preview === 'audio' && <audio src={value} controls className="mt-3 w-full" />}
     </div>
   );

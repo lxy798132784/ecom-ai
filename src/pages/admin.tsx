@@ -158,7 +158,7 @@ export default function AdminPage() {
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="管理员邮箱" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="管理员密码" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
           <button disabled={loading} className="w-full rounded-xl bg-brand-600 text-white py-3 font-semibold hover:bg-brand-700 disabled:opacity-60">{loading ? '登录中...' : '登录后台'}</button>
-          <p className="text-xs text-slate-400">需要在 Vercel 环境变量设置 ADMIN_EMAIL、ADMIN_PASSWORD，建议同时设置 ADMIN_SECRET。</p>
+          <p className="text-xs text-slate-400">请使用管理员账号登录。如需开通或重置权限，请联系站点负责人。</p>
         </form>
       </main>
     </>;
