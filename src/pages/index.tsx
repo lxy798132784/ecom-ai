@@ -289,7 +289,7 @@ export default function Home() {
       </section>
       {!loggedIn && <div className="mx-auto mt-4 max-w-3xl px-4"><div className="rounded-2xl border border-brand-500/30 bg-brand-500/10 p-4 text-center text-sm">🔐 {tr.loginRequired}</div></div>}
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[440px_minmax(0,1fr)]">
         <section className="space-y-4">
           <div id="create" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.creationPanel}</h2><span className="rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{tr.estimatedCost.replace('{points}', String(pointsCost))}</span></div>
@@ -304,50 +304,48 @@ export default function Home() {
 
           <div id="references" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.referencePanel}</h2><button onClick={clearReferences} disabled={!references.length} className="text-xs text-slate-400 disabled:opacity-40">{tr.clearAllRefs}</button></div>
-            <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center ${isDragActive ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-slate-950'}`}><input {...getInputProps()} /><div className="mb-2 text-3xl">🖼️</div><div className="text-sm font-medium">{tr.multiReferenceUpload}</div><div className="mt-1 text-xs text-slate-500">PNG · JPG · WEBP · GIF</div></div>
+            <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center ${isDragActive ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-slate-950'}`}><input {...getInputProps({ className: 'hidden' })} /><div className="mb-2 text-3xl">🖼️</div><div className="text-sm font-medium">{tr.multiReferenceUpload}</div><div className="mt-1 text-xs text-slate-500">PNG · JPG · WEBP · GIF</div></div>
             {references.length > 0 && <><div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><button onClick={selectAllReferences} className="rounded-full border border-white/10 px-2 py-1">{tr.selectAllRefs}</button><button onClick={clearSelectedReferences} className="rounded-full border border-white/10 px-2 py-1">{tr.clearSelectedRefs}</button><span className="text-slate-500">{tr.selectedRefs.replace('{count}', String(selectedReferenceImages.length))}</span></div><div className="mt-3 grid grid-cols-4 gap-2">{references.map((url, i) => <div key={url} className={`relative overflow-hidden rounded-xl border ${selectedRefUrls.includes(url) ? 'border-emerald-400 ring-2 ring-emerald-400/25' : activeRef === url ? 'border-brand-400 ring-2 ring-brand-400/25' : 'border-white/10'}`}><button onClick={() => toggleReferenceSelection(url)} className="block w-full"><img src={url} className="aspect-square w-full object-cover" alt="" /></button><button onClick={() => removeReference(url)} className="absolute right-1 top-1 h-5 w-5 rounded-full bg-black/70 text-xs text-white">×</button><span className="absolute left-1 top-1 rounded bg-black/70 px-1 text-[10px]">{selectedRefUrls.includes(url) ? '✓' : i + 1}</span><button onClick={() => setPrimaryReference(url)} className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px]">{tr.primaryRef}</button></div>)}</div></>}
             <div className="mt-2 text-xs text-slate-400">{selectedReferenceImages.length ? tr.multiReferenceReady.replace('{count}', String(selectedReferenceImages.length)) : tr.noActiveReference}</div>
           </div>
 
-          <div id="specs" className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
+          <div id="specs" className="rounded-3xl border border-white/[0.08] bg-[#0f1011] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
             <div className="mb-4 flex items-start justify-between gap-3">
-              <div><h2 className="font-bold tracking-[-0.02em]">{tr.generationSpec}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{tr.specHint}</p></div>
-              <span className="shrink-0 rounded-full border border-brand-400/20 bg-brand-500/10 px-2.5 py-1 text-[11px] font-semibold text-brand-200">{pointsCost * batchCount} pts</span>
+              <div><h2 className="text-[15px] font-semibold tracking-[-0.02em] text-slate-100">{tr.generationSpec}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{tr.specHint}</p></div>
+              <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-slate-300">{pointsCost * batchCount} pts</span>
             </div>
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/70 p-3">
-              <button type="button" onClick={() => setShowSizePicker(true)} title={tr.openSizePicker} className="group flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-3 text-left transition hover:border-brand-400/50 hover:bg-white/[0.06]">
-                <div><div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{tr.resolution}</div><div className="mt-1 font-mono text-sm font-semibold text-slate-100">{displaySize}</div></div>
-                <div className="rounded-xl bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-200 group-hover:bg-brand-500/20">{tr.openSizePicker}</div>
+            <div className="space-y-3">
+              <button type="button" onClick={() => setShowSizePicker(true)} title={tr.openSizePicker} className="group flex w-full items-center justify-between rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-left transition hover:border-brand-400/50 hover:bg-white/[0.055]">
+                <div><div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">{tr.resolution}</div><div className="mt-1 font-mono text-[15px] font-semibold text-slate-100">{displaySize}</div></div>
+                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300 group-hover:text-white">{tr.openSizePicker}</div>
               </button>
 
-              <div className="grid gap-3">
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-500"><span>{tr.quality}</span><span>×{QUALITY_OPTIONS.find(q => q.id === genQuality)?.mult || 1}</span></div>
-                  <div className="grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.025] p-1">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${genQuality === q.id ? 'bg-brand-600 text-white shadow-lg shadow-brand-950/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'}`}>{tr[q.labelKey]}</button>)}</div>
-                </div>
-
-                <div>
-                  <div className="mb-1.5 text-[11px] text-slate-500">{tr.outputFormat}</div>
-                  <div className="grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.025] p-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-xl px-2 py-2 text-xs font-semibold uppercase transition ${outputFormat === f ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-100'}`}>{f}</button>)}</div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="rounded-2xl border border-white/10 bg-white/[0.025] p-3" title={outputFormat === 'png' ? tr.compressionDisabledHint : tr.helpSpecDesc}>
-                    <span className="block text-[11px] text-slate-500">{tr.outputCompression}</span>
-                    <div className="mt-2 flex items-center gap-2"><input type="number" min={0} max={100} value={compressionPercent} disabled={outputFormat === 'png'} onChange={e => setCompressionQuality(Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100)} className="w-full rounded-xl border border-white/10 bg-slate-950 px-2 py-2 text-sm font-semibold text-slate-100 disabled:cursor-not-allowed disabled:opacity-40" /><span className="text-xs text-slate-500">%</span></div>
-                  </label>
-                  <label className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
-                    <span className="block text-[11px] text-slate-500">{tr.batchCount}</span>
-                    <div className="mt-2 flex items-center gap-1"><button type="button" onClick={() => setBatchCount(Math.max(1, batchCount - 1))} className="h-9 w-8 rounded-xl border border-white/10 text-slate-300 hover:bg-white/[0.06]">−</button><input type="number" min={1} max={12} value={batchCount} onChange={e => setBatchCount(Math.min(12, Math.max(1, Number(e.target.value) || 1)))} className="h-9 min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-2 text-center text-sm font-semibold text-slate-100" /><button type="button" onClick={() => setBatchCount(Math.min(12, batchCount + 1))} className="h-9 w-8 rounded-xl border border-white/10 text-slate-300 hover:bg-white/[0.06]">＋</button></div>
-                  </label>
-                </div>
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3">
+                <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500"><span>{tr.quality}</span><span>×{QUALITY_OPTIONS.find(q => q.id === genQuality)?.mult || 1}</span></div>
+                <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/30 p-1">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-lg px-2 py-2 text-xs font-medium transition ${genQuality === q.id ? 'bg-brand-600 text-white shadow-[0_0_0_1px_rgba(255,255,255,.12)_inset]' : 'text-slate-400 hover:bg-white/[0.08] hover:text-slate-100'}`}>{tr[q.labelKey]}</button>)}</div>
               </div>
 
-              <div className="flex flex-wrap gap-1.5 border-t border-white/10 pt-3 text-[11px] text-slate-400">
-                <span className="rounded-full bg-white/[0.05] px-2 py-1">{tr.selectedRefs.replace('{count}', String(selectedReferenceImages.length))}</span>
-                <span className="rounded-full bg-white/[0.05] px-2 py-1">{displaySize}</span>
-                <span className="rounded-full bg-white/[0.05] px-2 py-1">{outputFormat.toUpperCase()}</span>
-                <span className="rounded-full bg-white/[0.05] px-2 py-1">×{batchCount}</span>
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3">
+                <div className="mb-2 text-[11px] text-slate-500">{tr.outputFormat}</div>
+                <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/35 p-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide transition ${outputFormat === f ? 'bg-slate-100 text-slate-950 shadow-[0_0_0_1px_rgba(255,255,255,.18)_inset]' : 'text-slate-300 hover:bg-white/[0.09] hover:text-white'}`}>{f}</button>)}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3" title={outputFormat === 'png' ? tr.compressionDisabledHint : tr.helpSpecDesc}>
+                  <span className="block text-[11px] text-slate-500">{tr.outputCompression}</span>
+                  <div className="mt-2 flex items-center gap-2"><input type="number" min={0} max={100} value={compressionPercent} disabled={outputFormat === 'png'} onChange={e => setCompressionQuality(Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100)} className="w-full rounded-xl border border-white/[0.08] bg-[#08090a] px-2 py-2 text-sm font-semibold text-slate-100 outline-none focus:border-brand-400 disabled:cursor-not-allowed disabled:text-slate-600 disabled:opacity-50" /><span className="text-xs text-slate-500">%</span></div>
+                </label>
+                <label className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3">
+                  <span className="block text-[11px] text-slate-500">{tr.batchCount}</span>
+                  <div className="mt-2 flex items-center gap-1"><button type="button" onClick={() => setBatchCount(Math.max(1, batchCount - 1))} className="h-9 w-8 rounded-xl border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]">−</button><input type="number" min={1} max={12} value={batchCount} onChange={e => setBatchCount(Math.min(12, Math.max(1, Number(e.target.value) || 1)))} className="h-9 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-[#08090a] px-2 text-center text-sm font-semibold text-slate-100 outline-none focus:border-brand-400" /><button type="button" onClick={() => setBatchCount(Math.min(12, batchCount + 1))} className="h-9 w-8 rounded-xl border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]">＋</button></div>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-400">
+                <span className="rounded-full border border-white/[0.06] bg-white/[0.035] px-2 py-1">{tr.selectedRefs.replace('{count}', String(selectedReferenceImages.length))}</span>
+                <span className="rounded-full border border-white/[0.06] bg-white/[0.035] px-2 py-1">{displaySize}</span>
+                <span className="rounded-full border border-white/[0.06] bg-white/[0.035] px-2 py-1">{outputFormat.toUpperCase()}</span>
+                <span className="rounded-full border border-white/[0.06] bg-white/[0.035] px-2 py-1">×{batchCount}</span>
               </div>
             </div>
           </div>
@@ -393,7 +391,7 @@ export default function Home() {
           </div>
         </section>
 
-        <aside className="space-y-4 lg:col-span-2 xl:col-span-1">
+        <aside className="grid gap-4 lg:col-span-2 xl:grid-cols-2">
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4"><h2 className="font-bold">{tr.mediaSuiteTitle}</h2><p className="mt-2 text-xs leading-5 text-slate-500">{tr.mediaSuiteDesc}</p><div className="mt-4 space-y-2">{mediaTools.map(tool => <div key={tool.key} className="rounded-2xl border border-white/10 bg-slate-950 p-3"><div className="flex items-center justify-between"><div className="font-semibold">{tool.icon} {tool.label}</div><span className={`text-[11px] ${tool.ready ? 'text-emerald-300' : 'text-amber-300'}`}>{tool.ready ? tr.configured : tr.pendingConfig}</span></div><p className="mt-1 text-xs text-slate-500">{tool.desc}</p><div className="mt-3 flex gap-2 text-xs"><Link href={tool.href} className="rounded-lg border border-white/10 px-2 py-1 text-slate-300">{tr.openTool}</Link>{result && <Link href={withResult(tool.href)} className="rounded-lg bg-brand-600 px-2 py-1 text-white">{tr.useCurrentResult}</Link>}</div></div>)}</div></div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4"><h2 className="font-bold">{tr.workspaceStatus}</h2><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.selectedRefsLabel}</div><div className="mt-1 text-xl font-bold text-slate-100">{selectedReferenceImages.length}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.batchCount}</div><div className="mt-1 text-xl font-bold text-slate-100">{batchCount}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.galleryTitle}</div><div className="mt-1 text-xl font-bold text-slate-100">{historyItems.length + favoriteItems.length}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.compressionQuality}</div><div className="mt-1 text-xl font-bold text-slate-100">{Math.round(compressionQuality * 100)}%</div></div></div></div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-xs leading-5 text-slate-500">{tr.mediaPolishNote}</div>
