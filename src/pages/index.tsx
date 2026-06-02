@@ -8,6 +8,8 @@ import { t, Lang } from '../lib/i18n';
 type StudioMode = 'text' | 'edit' | 'background' | 'scene' | 'mask' | 'agent';
 type TaskStatus = 'running' | 'done' | 'error';
 type OutputFormat = 'png' | 'jpeg' | 'webp';
+type SizeTier = '1K' | '2K' | '4K';
+type SizePickerMode = 'auto' | 'ratio' | 'resolution';
 type GalleryItem = { id?: string; url: string; prompt?: string; action?: string; quality?: string; size?: string; createdAt?: string; provider?: string; model?: string; outputFormat?: string; referenceCount?: number };
 type StudioTask = { id: string; prompt: string; action: StudioMode; status: TaskStatus; inputUrl?: string; outputUrl?: string; error?: string; createdAt: number; finishedAt?: number };
 type FavoriteCollection = { id: string; name: string; urls: string[]; createdAt: number; updatedAt: number };
@@ -17,21 +19,26 @@ type MediaStatus = { video?: { configured: boolean }; audio?: { configured: bool
 const COLLECTION_KEY = 'image-studio-favorite-collections';
 const AGENT_KEY = 'image-studio-agent-messages';
 const QUALITY_OPTIONS = [
+  { id: 'auto', labelKey: 'qualityAuto', mult: 2 },
   { id: 'low', labelKey: 'qualityLow', mult: 1 },
   { id: 'medium', labelKey: 'qualityMedium', mult: 2 },
   { id: 'high', labelKey: 'qualityHigh', mult: 4 },
 ] as const;
-const SIZE_OPTIONS = [
-  { id: '1024x1024', label: '1:1 · 1024×1024', mult: 1 },
-  { id: '1280x720', label: '16:9 · 1280×720', mult: 1 },
-  { id: '720x1280', label: '9:16 · 720×1280', mult: 1 },
-  { id: '1920x1080', label: '16:9 · 1920×1080', mult: 2 },
-  { id: '1080x1920', label: '9:16 · 1080×1920', mult: 2 },
-  { id: '2048x2048', label: '1:1 · 2048×2048', mult: 2 },
-  { id: '2560x1440', label: '16:9 · 2560×1440', mult: 3 },
-  { id: '1440x2560', label: '9:16 · 1440×2560', mult: 3 },
-  { id: '3840x2160', label: '16:9 · 3840×2160', mult: 5 },
+const SIZE_TIERS: SizeTier[] = ['1K', '2K', '4K'];
+const RATIO_OPTIONS = [
+  { label: '1:1', value: '1:1' },
+  { label: '3:2', value: '3:2' },
+  { label: '2:3', value: '2:3' },
+  { label: '16:9', value: '16:9' },
+  { label: '9:16', value: '9:16' },
+  { label: '4:3', value: '4:3' },
+  { label: '3:4', value: '3:4' },
+  { label: '21:9', value: '21:9' },
 ] as const;
+const SIZE_OPTIONS = SIZE_TIERS.flatMap(tier => RATIO_OPTIONS.map(ratio => {
+  const size = calculateImageSize(tier, ratio.value);
+  return { id: size, label: `${tier} · ${ratio.label} · ${size.replace('x', '×')}`, mult: tier === '4K' ? 5 : tier === '2K' ? 3 : 1 };
+}));
 const SCENES = [
   { id: 'cinematic studio', e: '🎬', zh: '电影影棚', en: 'Cinematic' },
   { id: 'minimal clean background', e: '⚪', zh: '极简干净', en: 'Minimal' },
@@ -43,8 +50,40 @@ const SCENES = [
 
 function getLang(): Lang { if (typeof window === 'undefined') return 'zh'; return (localStorage.getItem('lang') as Lang) || 'zh'; }
 function setLang(l: Lang) { localStorage.setItem('lang', l); }
+function round16(value: number) { return Math.max(16, Math.round(value / 16) * 16); }
+function floor16(value: number) { return Math.max(16, Math.floor(value / 16) * 16); }
+function ceil16(value: number) { return Math.max(16, Math.ceil(value / 16) * 16); }
+function normalizeDimensions(width: number, height: number) {
+  let w = round16(width), h = round16(height);
+  const fit = (scale: number) => { w = floor16(w * scale); h = floor16(h * scale); };
+  const fill = (scale: number) => { w = ceil16(w * scale); h = ceil16(h * scale); };
+  for (let i = 0; i < 4; i++) {
+    const maxEdge = Math.max(w, h);
+    if (maxEdge > 3840) fit(3840 / maxEdge);
+    if (w / h > 3) w = floor16(h * 3); else if (h / w > 3) h = floor16(w * 3);
+    const pixels = w * h;
+    if (pixels > 8294400) fit(Math.sqrt(8294400 / pixels)); else if (pixels < 655360) fill(Math.sqrt(655360 / pixels));
+  }
+  return { width: w, height: h };
+}
+function normalizeImageSize(size: string) { const m = String(size).trim().match(/^(\d+)\s*[xX×]\s*(\d+)$/); if (!m) return String(size).trim(); const d = normalizeDimensions(Number(m[1]), Number(m[2])); return `${d.width}x${d.height}`; }
+function parseRatio(ratio: string) { const m = String(ratio).trim().match(/^(\d+(?:\.\d+)?)\s*[:xX×]\s*(\d+(?:\.\d+)?)$/); if (!m) return null; const width = Number(m[1]), height = Number(m[2]); return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? { width, height } : null; }
+function calculateImageSize(tier: SizeTier, ratio: string) {
+  const parsed = parseRatio(ratio) || { width: 1, height: 1 };
+  const exact: Record<string, Record<string, string>> = {
+    '1K': { '1:1': '1024x1024', '3:2': '1216x816', '2:3': '816x1216', '16:9': '1280x720', '9:16': '720x1280', '4:3': '1152x864', '3:4': '864x1152', '21:9': '1360x576' },
+    '2K': { '1:1': '2048x2048', '3:2': '2160x1440', '2:3': '1440x2160', '16:9': '2560x1440', '9:16': '1440x2560', '4:3': '2048x1536', '3:4': '1536x2048', '21:9': '2560x1088' },
+    '4K': { '1:1': '2880x2880', '3:2': '3360x2240', '2:3': '2240x3360', '16:9': '3840x2160', '9:16': '2160x3840', '4:3': '3328x2496', '3:4': '2496x3328', '21:9': '3840x1648' },
+  };
+  if (exact[tier]?.[ratio]) return exact[tier][ratio];
+  const pixels = tier === '4K' ? 8294400 : tier === '2K' ? 4194304 : 1048576;
+  const w = Math.sqrt(pixels * parsed.width / parsed.height);
+  const h = w * parsed.height / parsed.width;
+  const d = normalizeDimensions(w, h);
+  return `${d.width}x${d.height}`;
+}
 function uniqueImages(items: string[]): string[] { return Array.from(new Set((items || []).filter(Boolean))); }
-function calcPoints(quality: string, size: string) { return (QUALITY_OPTIONS.find(x => x.id === quality)?.mult || 2) * (SIZE_OPTIONS.find(x => x.id === size)?.mult || 1); }
+function calcPoints(quality: string, size: string) { const q = QUALITY_OPTIONS.find(x => x.id === quality)?.mult || 2; if (size === 'auto') return q; const m = String(size).match(/^(\d+)x(\d+)$/); if (!m) return q; const mp = (Number(m[1]) * Number(m[2])) / (1024 * 1024); const sm = mp > 7 ? 5 : mp > 3 ? 3 : mp > 1.5 ? 2 : 1; return q * sm; }
 function newId() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function readLocalJson<T>(key: string, fallback: T): T { if (typeof window === 'undefined') return fallback; try { return JSON.parse(localStorage.getItem(key) || '') as T; } catch { return fallback; } }
 function writeLocalJson(key: string, value: unknown) { if (typeof window !== 'undefined') localStorage.setItem(key, JSON.stringify(value)); }
@@ -119,8 +158,13 @@ export default function Home() {
   const [compressionQuality, setCompressionQuality] = useState(0.9);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [genQuality, setGenQuality] = useState<'low'|'medium'|'high'>('medium');
-  const [genSize, setGenSize] = useState<typeof SIZE_OPTIONS[number]['id']>('1024x1024');
+  const [genQuality, setGenQuality] = useState<'auto'|'low'|'medium'|'high'>('auto');
+  const [genSize, setGenSize] = useState<string>('auto');
+  const [moderation, setModeration] = useState<'auto'|'low'>('auto');
+  const [sizePickerMode, setSizePickerMode] = useState<SizePickerMode>('auto');
+  const [sizeTier, setSizeTier] = useState<SizeTier>('1K');
+  const [sizeRatio, setSizeRatio] = useState('1:1');
+  const [customRatio, setCustomRatio] = useState('16:9');
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('png');
   const [scene, setScene] = useState('cinematic studio');
   const [showLogin, setShowLogin] = useState(false);
@@ -143,7 +187,7 @@ export default function Home() {
 
   const usageLeft = Math.max(0, usageLimit - usageCount);
   const pointsCost = calcPoints(genQuality, genSize);
-  const displaySize = genSize || `${customWidth}x${customHeight}`;
+  const displaySize = genSize === 'auto' ? tr.sizeAuto : genSize;
   const compressionPercent = Math.round(compressionQuality * 100);
   const favoriteUrls = favoriteItems.map(x => x.url);
   const activeGallery = viewMode === 'history' ? historyItems : favoriteItems;
@@ -216,7 +260,7 @@ export default function Home() {
     setTasks(p => [{ id, prompt: effectivePrompt || scene, action: mode, status: 'running' as const, inputUrl: primaryReference, createdAt: Date.now() }, ...p].slice(0, 50));
     setLoading(true); setError(''); setResult(null);
     try {
-      const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: primaryReference, action, scene, prompt: effectivePrompt, customPrompt: effectivePrompt, quality: genQuality, size: genSize, output_format: outputFormat, referenceImages: selectedReferenceImages, batch: batchCount > 1, batchCount: Math.min(12, Math.max(1, Number(batchCount) || 1)), compressionQuality }) });
+      const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: primaryReference, action, scene, prompt: effectivePrompt, customPrompt: effectivePrompt, quality: genQuality, size: genSize, output_format: outputFormat, output_compression: outputFormat === 'png' ? null : compressionPercent, moderation, referenceImages: selectedReferenceImages, batch: batchCount > 1, batchCount: Math.min(12, Math.max(1, Number(batchCount) || 1)), compressionQuality }) });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error(tr.apiEmptyUrl);
@@ -336,8 +380,9 @@ export default function Home() {
                 <div><div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">{tr.resolution}</div><div className="mt-1 font-mono text-[15px] font-semibold text-slate-100">{displaySize}</div></div>
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300 group-hover:text-white">{tr.openSizePicker}</div>
               </button>
-              <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/[0.08] bg-[#08090a] p-1">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl px-2 py-2 text-xs font-medium transition ${genQuality === q.id ? 'bg-brand-600 text-white' : 'text-slate-400 hover:bg-white/[0.08] hover:text-slate-100'}`}>{tr[q.labelKey]}</button>)}</div>
+              <div className="grid grid-cols-4 gap-1 rounded-2xl border border-white/[0.08] bg-[#08090a] p-1">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl px-2 py-2 text-xs font-medium transition ${genQuality === q.id ? 'bg-brand-600 text-white' : 'text-slate-400 hover:bg-white/[0.08] hover:text-slate-100'}`}>{tr[q.labelKey]}</button>)}</div>
               <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/[0.08] bg-[#08090a] p-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-xl px-2 py-2 text-xs font-semibold uppercase tracking-wide transition ${outputFormat === f ? 'bg-brand-600 text-white' : 'text-slate-400 hover:bg-white/[0.08] hover:text-white'}`}>{f}</button>)}</div>
+              <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/[0.08] bg-[#08090a] p-1"><button onClick={() => setModeration('auto')} className={`rounded-xl px-2 py-2 text-xs font-medium ${moderation === 'auto' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:bg-white/[0.08]'}`}>{tr.moderationAuto}</button><button onClick={() => setModeration('low')} className={`rounded-xl px-2 py-2 text-xs font-medium ${moderation === 'low' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:bg-white/[0.08]'}`}>{tr.moderationLow}</button></div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="rounded-2xl border border-white/[0.08] bg-[#08090a] p-3" title={outputFormat === 'png' ? tr.compressionDisabledHint : tr.helpSpecDesc}><span className="block text-[11px] text-slate-500">{tr.outputCompression}</span><div className="mt-2 flex items-center gap-1"><input type="number" min={0} max={100} value={compressionPercent} disabled={outputFormat === 'png'} onChange={e => setCompressionQuality(Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100)} className="w-full rounded-xl border border-white/[0.08] bg-black/40 px-2 py-2 text-sm font-semibold text-slate-100 outline-none focus:border-brand-400 disabled:cursor-not-allowed disabled:text-slate-600 disabled:opacity-50" /><span className="text-xs text-slate-500">%</span></div></label>
                 <label className="rounded-2xl border border-white/[0.08] bg-[#08090a] p-3"><span className="block text-[11px] text-slate-500">{tr.batchCount}</span><div className="mt-2 flex items-center gap-1"><button type="button" onClick={() => setBatchCount(Math.max(1, batchCount - 1))} className="h-9 w-8 rounded-xl border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]">−</button><input type="number" min={1} max={12} value={batchCount} onChange={e => setBatchCount(Math.min(12, Math.max(1, Number(e.target.value) || 1)))} className="h-9 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-black/40 px-2 text-center text-sm font-semibold text-slate-100 outline-none focus:border-brand-400" /><button type="button" onClick={() => setBatchCount(Math.min(12, batchCount + 1))} className="h-9 w-8 rounded-xl border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]">＋</button></div></label>
@@ -381,10 +426,25 @@ export default function Home() {
         </aside>
       </div>
       <Modal show={showSizePicker} title={tr.sizePickerTitle} onClose={() => setShowSizePicker(false)}>
-        <div className="space-y-4 text-sm">
+        <div className="space-y-5 text-sm">
           <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{tr.sizeCurrent}: <b>{displaySize}</b></div>
-          <div><p className="mb-2 text-xs font-semibold text-slate-500">{tr.sizeModePreset}</p><div className="grid grid-cols-3 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => { setGenSize(sz.id); }} className={`rounded-xl border px-2 py-2 text-left text-xs ${genSize === sz.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white'}`}><div className="font-semibold">{sz.label.split(' · ')[0]}</div><div className="text-[10px] text-slate-500">{sz.label.split(' · ')[1]}</div></button>)}</div></div>
-          <div><p className="mb-2 text-xs font-semibold text-slate-500">{tr.sizeModeCustom}</p><div className="grid grid-cols-2 gap-2"><input value={customWidth} onChange={e => setCustomWidth(e.target.value)} placeholder={tr.customWidth} type="number" className="rounded-xl border border-slate-200 px-3 py-2"/><input value={customHeight} onChange={e => setCustomHeight(e.target.value)} placeholder={tr.customHeight} type="number" className="rounded-xl border border-slate-200 px-3 py-2"/></div><button onClick={() => { const w=Math.min(3840, Math.max(256, Number(customWidth)||1024)); const h=Math.min(3840, Math.max(256, Number(customHeight)||1024)); setGenSize(`${w}x${h}` as any); setShowSizePicker(false); }} className="mt-3 w-full rounded-xl bg-brand-600 py-2 text-white">{tr.applySize}</button></div>
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 text-xs">
+            {(['auto','ratio','resolution'] as SizePickerMode[]).map(m => <button key={m} onClick={() => setSizePickerMode(m)} className={`rounded-lg px-2 py-2 font-medium ${sizePickerMode === m ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{m === 'auto' ? tr.sizeAuto : m === 'ratio' ? tr.sizeByRatio : tr.sizeCustomWH}</button>)}
+          </div>
+          {sizePickerMode === 'auto' && <div className="rounded-2xl border border-blue-100 bg-blue-50 p-6 text-center text-sm text-blue-700"><div className="mb-2 text-3xl">⚡</div><div className="font-semibold">{tr.sizeAuto}</div><p className="mt-2 text-xs leading-5 text-blue-500">{tr.sizeAutoDesc}</p><button onClick={() => { setGenSize('auto'); setShowSizePicker(false); }} className="mt-4 w-full rounded-xl bg-brand-600 py-2 text-white">{tr.applySize}</button></div>}
+          {sizePickerMode === 'ratio' && <div className="space-y-4">
+            <section><p className="mb-2 text-xs font-semibold text-slate-500">{tr.baseResolution}</p><div className="grid grid-cols-3 gap-2">{SIZE_TIERS.map(tier => <button key={tier} onClick={() => setSizeTier(tier)} className={`rounded-xl border px-3 py-2 text-sm font-semibold ${sizeTier === tier ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'}`}>{tier}</button>)}</div></section>
+            <section><p className="mb-2 text-xs font-semibold text-slate-500">{tr.imageRatio}</p><div className="grid grid-cols-4 gap-2">{RATIO_OPTIONS.map(item => { const [rw,rh] = item.value.split(':').map(Number); const horizontal = rw > rh; const square = rw === rh; return <button key={item.value} onClick={() => setSizeRatio(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${sizeRatio === item.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'}`}><div className="mx-auto mb-1 flex h-5 w-5 items-center justify-center"><div className="rounded-[3px] border border-current opacity-70" style={{ width: horizontal || square ? '100%' : `${(rw / rh) * 100}%`, height: !horizontal || square ? '100%' : `${(rh / rw) * 100}%` }} /></div>{item.label}</button> })}<button onClick={() => setSizeRatio('custom')} className={`col-span-4 rounded-xl border px-3 py-2 text-xs ${sizeRatio === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'}`}>{tr.customRatio}</button></div></section>
+            {sizeRatio === 'custom' && <label className="block"><span className="mb-2 block text-xs font-semibold text-slate-500">{tr.customRatioInput}</span><input value={customRatio} onChange={e => setCustomRatio(e.target.value)} placeholder={tr.customRatioPlaceholder} className={`w-full rounded-xl border px-3 py-2 ${parseRatio(customRatio) ? 'border-slate-200' : 'border-red-300'}`} /></label>}
+            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{tr.willUse}: <b>{calculateImageSize(sizeTier, sizeRatio === 'custom' ? customRatio : sizeRatio)}</b></div>
+            <button onClick={() => { const ratio = sizeRatio === 'custom' ? customRatio : sizeRatio; if (!parseRatio(ratio)) return; setGenSize(calculateImageSize(sizeTier, ratio)); setShowSizePicker(false); }} className="w-full rounded-xl bg-brand-600 py-2 text-white">{tr.applySize}</button>
+          </div>}
+          {sizePickerMode === 'resolution' && <div className="space-y-4">
+            <p className="text-xs leading-5 text-slate-500">{tr.sizeLimitText}</p>
+            <div className="grid grid-cols-2 gap-2"><label><span className="mb-1 block text-xs text-slate-500">{tr.customWidth}</span><input value={customWidth} onChange={e => setCustomWidth(e.target.value)} type="number" className="w-full rounded-xl border border-slate-200 px-3 py-2"/></label><label><span className="mb-1 block text-xs text-slate-500">{tr.customHeight}</span><input value={customHeight} onChange={e => setCustomHeight(e.target.value)} type="number" className="w-full rounded-xl border border-slate-200 px-3 py-2"/></label></div>
+            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{tr.willUse}: <b>{normalizeImageSize(`${customWidth}x${customHeight}`)}</b></div>
+            <button onClick={() => { const w=Number(customWidth)||1024; const h=Number(customHeight)||1024; setGenSize(normalizeImageSize(`${w}x${h}`)); setShowSizePicker(false); }} className="w-full rounded-xl bg-brand-600 py-2 text-white">{tr.applySize}</button>
+          </div>}
         </div>
       </Modal>
       <Modal show={Boolean(detailItem)} title={tr.imageDetails} onClose={() => setDetailItem(null)}>{detailItem && <div className="space-y-3 text-sm"><img src={detailItem.url} className="max-h-64 w-full rounded-xl object-contain bg-slate-100" alt="" /><div className="grid grid-cols-2 gap-2 text-xs"><div><b>{tr.customPrompt}</b><p className="break-words text-slate-500">{detailItem.prompt || '-'}</p></div><div><b>{tr.actions}</b><p className="text-slate-500">{detailItem.action || '-'}</p></div><div><b>{tr.resolution}</b><p className="text-slate-500">{detailItem.size || '-'}</p></div><div><b>{tr.outputFormat}</b><p className="text-slate-500">{detailItem.outputFormat || '-'}</p></div><div><b>{tr.referencePanel}</b><p className="text-slate-500">{detailItem.referenceCount || 0}</p></div><div><b>{tr.createdAt}</b><p className="text-slate-500">{detailItem.createdAt || '-'}</p></div></div><button onClick={() => navigator.clipboard?.writeText(detailItem.prompt || detailItem.url)} className="w-full rounded-xl bg-brand-600 py-2 text-white">{tr.copy}</button></div>}</Modal>

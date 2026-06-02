@@ -14,47 +14,48 @@ const openai = new OpenAI({
 
 type ModelProvider = 'openai';
 
-export type ImageQuality = 'low' | 'medium' | 'high';
-export type ImageSizeKey = '1024x1024' | '1280x720' | '720x1280' | '1920x1080' | '1080x1920' | '2048x2048' | '2560x1440' | '1440x2560' | '3840x2160';
+export type ImageQuality = 'auto' | 'low' | 'medium' | 'high';
+export type ImageSizeKey = string;
 
 export interface ImageGenerationOptions {
   quality?: ImageQuality;
   size?: ImageSizeKey;
   outputFormat?: 'png' | 'jpeg' | 'webp';
+  outputCompression?: number | null;
+  moderation?: 'auto' | 'low';
 }
 
-const SIZE_MAP: Record<ImageSizeKey, { width: number; height: number; apiSize: '1024x1024' | '1536x1024' | '1024x1536' }> = {
-  '1024x1024': { width: 1024, height: 1024, apiSize: '1024x1024' },
-  '1280x720': { width: 1280, height: 720, apiSize: '1536x1024' },
-  '720x1280': { width: 720, height: 1280, apiSize: '1024x1536' },
-  '1920x1080': { width: 1920, height: 1080, apiSize: '1536x1024' },
-  '1080x1920': { width: 1080, height: 1920, apiSize: '1024x1536' },
-  '2048x2048': { width: 2048, height: 2048, apiSize: '1024x1024' },
-  '2560x1440': { width: 2560, height: 1440, apiSize: '1536x1024' },
-  '1440x2560': { width: 1440, height: 2560, apiSize: '1024x1536' },
-  '3840x2160': { width: 3840, height: 2160, apiSize: '1536x1024' },
-};
-
 const QUALITY_PROMPT: Record<ImageQuality, string> = {
+  auto: 'balanced automatic quality, sharp details, clean commercial photography',
   low: 'fast draft quality, clean product composition',
   medium: 'balanced quality, sharp details, commercial e-commerce photography',
   high: 'premium quality, ultra-detailed, polished commercial advertising photography',
 };
 
+function normalizeSizeKey(size?: string) {
+  const raw = String(size || '').trim();
+  if (!raw || raw === 'auto') return { size: 'auto', width: 1024, height: 1024, apiSize: 'auto' as const };
+  const m = raw.match(/^(\d+)\s*[xX×]\s*(\d+)$/);
+  if (!m) return { size: 'auto', width: 1024, height: 1024, apiSize: 'auto' as const };
+  const width = Math.max(16, Math.round(Number(m[1]) / 16) * 16);
+  const height = Math.max(16, Math.round(Number(m[2]) / 16) * 16);
+  const apiSize = width === height ? '1024x1024' : width > height ? '1536x1024' : '1024x1536';
+  return { size: `${width}x${height}`, width, height, apiSize: apiSize as '1024x1024' | '1536x1024' | '1024x1536' | 'auto' };
+}
+
 function normalizeOptions(options?: ImageGenerationOptions) {
-  const quality: ImageQuality = options?.quality === 'low' || options?.quality === 'high' ? options.quality : 'medium';
-  const size: ImageSizeKey = options?.size && SIZE_MAP[options.size] ? options.size : '1024x1024';
-  return { quality, size, ...SIZE_MAP[size] };
+  const quality: ImageQuality = options?.quality === 'low' || options?.quality === 'medium' || options?.quality === 'high' ? options.quality : 'auto';
+  return { quality, ...normalizeSizeKey(options?.size) };
 }
 
 async function resizeOutput(url: string, options?: ImageGenerationOptions): Promise<string> {
   const { width, height, quality } = normalizeOptions(options);
-  if (width === 1024 && height === 1024) return url;
+  if (options?.size === 'auto') return url;
   try {
     const input = url.startsWith('data:')
       ? Buffer.from(url.replace(/^data:image\/\w+;base64,/, ''), 'base64')
       : Buffer.from(await (await fetch(url)).arrayBuffer());
-    const jpegQuality = quality === 'low' ? 78 : quality === 'high' ? 94 : 88;
+    const jpegQuality = options?.outputCompression ?? (quality === 'low' ? 78 : quality === 'high' ? 94 : 88);
     const requestedFormat = options?.outputFormat === 'webp' ? 'webp' : options?.outputFormat === 'png' ? 'png' : 'jpeg';
     if (requestedFormat === 'png') {
       const out = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' }).png().toBuffer();

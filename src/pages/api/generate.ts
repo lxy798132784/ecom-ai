@@ -121,7 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { image, action, scene, prompt, model: preferredModel, batch, batchCount } = body;
     const referenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.filter((x: any) => typeof x === 'string') : [];
-    const generationOptions: ImageGenerationOptions = { quality: normalizeQuality(body.quality), size: normalizeSize(body.size), outputFormat: body.output_format === 'webp' ? 'webp' : body.output_format === 'jpeg' ? 'jpeg' : 'png' };
+    const generationOptions: ImageGenerationOptions = { quality: normalizeQuality(body.quality), size: normalizeSize(body.size), outputFormat: body.output_format === 'webp' ? 'webp' : body.output_format === 'jpeg' ? 'jpeg' : 'png', outputCompression: typeof body.output_compression === 'number' ? body.output_compression : null, moderation: body.moderation === 'low' ? 'low' : 'auto' };
     const pointsCost = calcImagePoints(generationOptions.quality, generationOptions.size);
 
     if (action !== 'text2img' && !image) {
