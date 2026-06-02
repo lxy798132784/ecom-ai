@@ -4,7 +4,10 @@ import path from 'path';
 import os from 'os';
 import { File as NodeFile } from 'buffer';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || 'https://ai-pixel.online/v1',
+});
 
 // ─── 模型定义 ────────────────────────────────
 type ModelProvider = 'openai' | 'zhipu' | 'xiaomi' | 'deepseek' | 'gemini';
