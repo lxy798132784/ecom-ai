@@ -25,6 +25,14 @@ function cleanList(items: unknown[]): string[] {
   return Array.from(new Set((items || []).map(x => String(x || '')).filter(Boolean)));
 }
 
+function userAliasKeys(usersHash: Record<string, any>, email: string, rawEmail = '') {
+  return Array.from(new Set([
+    email,
+    rawEmail,
+    ...Object.keys(usersHash || {}).filter(k => normalizeEmail(k) === email || normalizeEmail(usersHash[k]?.email || '') === email),
+  ].filter(Boolean)));
+}
+
 async function deletedImageSets(email: string, kind: 'history' | 'fav') {
   const urlKeys = kind === 'history' ? [`deleted:history:${email}`] : [`deleted:fav:${email}`, `deleted:favorites:${email}`];
   const idKeys = kind === 'history' ? [`deleted:history-id:${email}`] : [`deleted:fav-id:${email}`, `deleted:favorites-id:${email}`];
@@ -88,12 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rows = await Promise.all(Object.entries(usersHash).map(async ([emailKey, raw]) => {
       const user = sanitizeUser(raw, emailKey);
       const email = normalizeEmail(user.email);
+      const aliases = userAliasKeys(usersHash, email, user.email);
       const [freeUsage, proUsage, credits, history, favorites, deletedHistory, deletedFav] = await Promise.all([
         kv.get<number>(getUsageKey(email, month, 'free')).catch(() => 0),
         kv.get<number>(getUsageKey(email, month, 'pro')).catch(() => 0),
         kv.get<number>(`credits:${email}`).catch(() => 0),
-        kv.lrange(`history:${email}`, 0, 99).catch(() => []),
-        kv.lrange(`fav:${email}`, 0, 99).catch(() => []),
+        Promise.all(aliases.map(e => kv.lrange(`history:${e}`, 0, 199).catch(() => []))).then(parts => parts.flat()),
+        Promise.all(aliases.flatMap(e => [`fav:${e}`, `favorites:${e}`]).map(k => kv.lrange(k, 0, 199).catch(() => []))).then(parts => parts.flat()),
         deletedImageSets(email, 'history'),
         deletedImageSets(email, 'fav'),
       ]);

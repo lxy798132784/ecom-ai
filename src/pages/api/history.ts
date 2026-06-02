@@ -55,7 +55,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rawEmail = String(token.email);
   const email = normalizeEmail(rawEmail);
-  const emailKeys = Array.from(new Set([email, rawEmail]));
+  const usersHash = (await kv.hgetall<Record<string, any>>('users').catch(() => ({}))) || {};
+  const aliasKeys = Object.keys(usersHash).filter(k => normalizeEmail(k) === email || normalizeEmail(usersHash[k]?.email || '') === email);
+  const emailKeys = Array.from(new Set([email, rawEmail, ...aliasKeys]));
   const historyKeys = emailKeys.map(e => `history:${e}`);
   const key = `history:${email}`;
 
@@ -67,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       getNumber(usageKey(email, 'free', month)),
       getNumber(usageKey(email, 'pro', month)),
       findUserByEmail(email).catch(() => undefined),
-      getDeleted(emailKeys),
+      getDeleted([email]),
     ]);
     const plan = user?.plan || (token.plan as string) || 'free';
     const limit = plan === 'pro' ? PRO_LIMIT : FREE_LIMIT;
@@ -89,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const next = [target, ...existing.filter(x => x !== target && imageId(x) !== targetId)].slice(0, 100);
       await replaceList(key, next);
     }
-    const deleted = await getDeleted(emailKeys);
+    const deleted = await getDeleted([email]);
     const history = filterDeleted((await Promise.all(historyKeys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);
     return res.json({ ok: true, history });
   }
@@ -109,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         kv.sadd(`deleted:history-id:${e}`, targetId).catch(() => 0),
       ]),
     ]);
-    const deleted = await getDeleted(emailKeys);
+    const deleted = await getDeleted([email]);
     const history = filterDeleted((await Promise.all(historyKeys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);
     return res.json({ ok: true, deleted: true, history });
   }

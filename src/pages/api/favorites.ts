@@ -40,12 +40,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rawEmail = String(token.email);
   const email = normalizeEmail(rawEmail);
-  const emailKeys = Array.from(new Set([email, rawEmail]));
+  const usersHash = (await kv.hgetall<Record<string, any>>('users').catch(() => ({}))) || {};
+  const aliasKeys = Object.keys(usersHash).filter(k => normalizeEmail(k) === email || normalizeEmail(usersHash[k]?.email || '') === email);
+  const emailKeys = Array.from(new Set([email, rawEmail, ...aliasKeys]));
   const keys = emailKeys.flatMap(e => [`fav:${e}`, `favorites:${e}`]);
   const key = `fav:${email}`;
 
   if (req.method === 'GET') {
-    const deleted = await getDeleted(emailKeys);
+    const deleted = await getDeleted([email]);
     const favorites = filterDeleted((await Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);
     return res.json({ favorites });
   }
@@ -55,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!url) return res.status(400).json({ error: '缺少url' });
     const target = String(url);
     const targetId = imageId(target);
-    const deleted = await getDeleted(emailKeys);
+    const deleted = await getDeleted([email]);
     const existing = filterDeleted((await Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);
     if (existing.some(x => x === target || imageId(x) === targetId)) {
       await Promise.all([
@@ -70,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           kv.sadd(`deleted:favorites-id:${e}`, targetId).catch(() => 0),
         ]),
       ]);
-      const deletedNow = await getDeleted(emailKeys);
+      const deletedNow = await getDeleted([email]);
       const favorites = filterDeleted((await Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deletedNow);
       return res.json({ ok: true, added: false, favorites });
     }
@@ -101,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         kv.sadd(`deleted:favorites-id:${e}`, targetId).catch(() => 0),
       ]),
     ]);
-    const deleted = await getDeleted(emailKeys);
+    const deleted = await getDeleted([email]);
     const favorites = filterDeleted((await Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);
     return res.json({ ok: true, deleted: true, favorites });
   }
