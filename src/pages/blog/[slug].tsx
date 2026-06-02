@@ -5,6 +5,17 @@ import Head from 'next/head';
 
 interface PostData { title: string; date: string; category: string; description: string; content: string; }
 
+function fallbackDescription(title?: string, content?: string): string {
+  const plain = (content || '')
+    .replace(/^#+\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/\[[^\]]+\]\([^\)]+\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (plain || title || 'AI ecommerce product photography guide').slice(0, 160);
+}
+
 export default function BlogPost({ post }: { post: PostData }) {
   if (!post) return <div className="text-center py-20 text-slate-500">Post not found</div>;
   return (
@@ -63,7 +74,9 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
       const m = line.match(/^(\w+):\s*(.+)/);
       if (m) meta[m[1]] = m[2].trim();
     });
-    return { props: { post: { title: meta.title, date: meta.date, category: meta.category, description: meta.description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(fmMatch[2].trim()).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' } } };
+    const body = fmMatch[2].trim();
+    const description = meta.description || meta.excerpt || fallbackDescription(meta.title, body);
+    return { props: { post: { title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(body).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' } } };
   }
   return { props: { post: null } };
 };
