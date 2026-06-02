@@ -182,6 +182,8 @@ export default function Home() {
       if (!data.url) throw new Error('API returned empty URL');
       setResult(data.url); setResults(p => prependUnique(p, data.url));
       if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
+        if (data.credits !== undefined) setCredits(data.credits);
+      if (data.credits !== undefined) setCredits(data.credits);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   };
@@ -282,7 +284,11 @@ export default function Home() {
 
   return (
     <>
-      <Head><title>{tr.brand}</title></Head>
+      <Head>
+        <title>{tr.brand} - AI Product Photography for Ecommerce</title>
+        <meta name="description" content="Generate ecommerce product photos, white backgrounds, lifestyle scenes, and marketplace-ready images with AI." />
+        <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/`} />
+      </Head>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         {/* Top Bar */}
         <div className="bg-white border-b border-slate-200">
@@ -290,6 +296,7 @@ export default function Home() {
             <span className="font-bold text-slate-800">🛍️ {tr.brand}</span>
             {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} 次</span>)}
             <div className="flex items-center gap-3 text-sm">
+              <a href="/blog" className="text-xs text-slate-500 hover:text-brand-600 transition">📚 Blog</a>
               {/* Lang toggle */}
               <button onClick={toggleLang} className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 transition">
                 {lang === 'zh' ? 'EN' : '中'}
@@ -302,7 +309,7 @@ export default function Home() {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge}</span>
                   ) : (
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                      {tr.freeLeft} {usageLeft === Infinity ? '∞' : usageLeft} {tr.times}
+                      {tr.freeLeft} {usageLeft === Infinity ? '∞' : usageLeft} {tr.times}{credits > 0 ? ` · 余 ${credits} 赠送` : ''}
                     </span>
                   )}
                   {userPlan !== 'pro' && (

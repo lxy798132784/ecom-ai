@@ -17,14 +17,30 @@ async function getUsage(email: string): Promise<number> {
   try { return (await kv.get<number>(await getUsageKey(email))) || 0; } catch { return 0; }
 }
 
+async function getCredits(email: string): Promise<number> {
+  try { return (await kv.get<number>(`credits:${email}`)) || 0; } catch { return 0; }
+}
+
 async function checkAndIncrement(email: string, plan: string) {
+  const usageKey = await getUsageKey(email);
   const usage = await getUsage(email);
   const limit = plan === 'pro' ? PRO_LIMIT : FREE_LIMIT;
-  if (usage >= limit) {
-    return { allowed: false, limit, usage, error: `${plan === 'pro' ? 'PRO' : '免费'}额度已用完（${limit} 次/月）` };
+
+  if (usage < limit) {
+    await kv.incr(usageKey);
+    return { allowed: true, limit, usage: usage + 1, credits: await getCredits(email), paidWith: 'monthly' as const };
   }
-  await kv.incr(await getUsageKey(email));
-  return { allowed: true, limit, usage: usage + 1 };
+
+  if (plan !== 'pro') {
+    const credits = await getCredits(email);
+    if (credits > 0) {
+      const nextCredits = Math.max(0, credits - 1);
+      await kv.set(`credits:${email}`, nextCredits);
+      return { allowed: true, limit, usage, credits: nextCredits, paidWith: 'credit' as const };
+    }
+  }
+
+  return { allowed: false, limit, usage, credits: await getCredits(email), error: `${plan === 'pro' ? 'PRO' : '免费'}额度已用完（${limit} 次/月）` };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -50,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const usageCheck = await checkAndIncrement(token.email!, plan);
     if (!usageCheck.allowed) {
-      return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage });
+      return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage, credits: usageCheck.credits });
     }
 
     let url = '';
@@ -84,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await kv.ltrim(historyKey, 0, 19);
     } catch {}
 
-    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, ...meta });
+    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, credits: usageCheck.credits, paidWith: usageCheck.paidWith, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

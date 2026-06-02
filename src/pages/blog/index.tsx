@@ -7,11 +7,25 @@ interface Post {
   slug: string; title: string; date: string; category: string; description: string;
 }
 
+function fallbackDescription(title?: string, content?: string): string {
+  const plain = (content || '')
+    .replace(/^#+\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/\[[^\]]+\]\([^\)]+\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (plain || title || 'AI ecommerce product photography guide').slice(0, 160);
+}
+
 export default function BlogIndex({ posts }: { posts: Post[] }) {
   return (
     <>
-      <Head><title>EcomPic Blog - AI Product Photography Guides</title>
-      <meta name="description" content="Expert guides on AI product photography, ecommerce image optimization, and more." /></Head>
+      <Head>
+        <title>EcomPic Blog - AI Product Photography Guides</title>
+        <meta name="description" content="Expert guides on AI product photography, ecommerce image optimization, marketplace image requirements, and product photo workflows." />
+        <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/blog`} />
+      </Head>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">📝 EcomPic Blog</h1>
@@ -45,7 +59,8 @@ export const getStaticProps: GetStaticProps = async () => {
       const m = line.match(/^(\w+):\s*(.+)/);
       if (m) meta[m[1]] = m[2].trim();
     });
-    if (meta.slug && meta.title) posts.push({ slug: meta.slug, title: meta.title, date: meta.date || '', category: meta.category || '', description: meta.description || '' });
+    const body = raw.split('---').slice(2).join('---').trim();
+    if (meta.slug && meta.title) posts.push({ slug: meta.slug, title: meta.title, date: meta.date || '', category: meta.category || 'Guide', description: meta.description || meta.excerpt || fallbackDescription(meta.title, body) });
   }
   posts.sort((a, b) => b.date.localeCompare(a.date));
   return { props: { posts } };

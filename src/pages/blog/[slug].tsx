@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import Head from 'next/head';
 
-interface PostData { title: string; date: string; category: string; description: string; content: string; }
+interface PostData { slug: string; title: string; date: string; category: string; description: string; content: string; }
 
 function fallbackDescription(title?: string, content?: string): string {
   const plain = (content || '')
@@ -20,8 +20,11 @@ export default function BlogPost({ post }: { post: PostData }) {
   if (!post) return <div className="text-center py-20 text-slate-500">Post not found</div>;
   return (
     <>
-      <Head><title>{post.title} - EcomPic Blog</title>
-      <meta name="description" content={post.description} /></Head>
+      <Head>
+        <title>{post.title} - EcomPic Blog</title>
+        <meta name="description" content={post.description} />
+        <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/blog/${post.slug}`} />
+      </Head>
       <main className="min-h-screen bg-white py-12 px-4">
         <article className="max-w-3xl mx-auto">
           <a href="/blog" className="text-sm text-brand-500 hover:underline mb-4 block">← Back to Blog</a>
@@ -76,7 +79,7 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
     });
     const body = fmMatch[2].trim();
     const description = meta.description || meta.excerpt || fallbackDescription(meta.title, body);
-    return { props: { post: { title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(body).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' } } };
+    return { props: { post: { slug, title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(body).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' } } };
   }
   return { props: { post: null } };
 };

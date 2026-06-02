@@ -1,5 +1,9 @@
 import { kv } from '@vercel/kv';
 
+export function normalizeEmail(email: string): string {
+  return (email || '').trim().toLowerCase();
+}
+
 interface User {
   id: string;
   email: string;
@@ -10,10 +14,11 @@ interface User {
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  const user = await kv.hget('users', email);
+  const user = await kv.hget('users', normalizeEmail(email));
   return user as User | undefined;
 }
 
 export async function writeUser(user: User) {
-  await kv.hset('users', { [user.email]: user });
+  const email = normalizeEmail(user.email);
+  await kv.hset('users', { [email]: { ...user, email } });
 }
