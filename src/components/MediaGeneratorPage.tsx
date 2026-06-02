@@ -9,6 +9,7 @@ import { t, Lang } from '../lib/i18n';
 type Kind = 'video' | 'audio' | 'voice-clone';
 
 type Bilingual = { zh: string; en: string };
+type MediaHistoryItem = { id?: string; kind: Kind; url: string; prompt?: string; createdAt?: string; model?: string; provider?: string };
 type Field = {
   name: string | Bilingual;
   description: string | Bilingual;
@@ -73,7 +74,9 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mediaHistory, setMediaHistory] = useState<MediaHistoryItem[]>([]);
   useEffect(() => { const input = typeof router.query.input === 'string' ? router.query.input : ''; if (input && !inputUrl) setInputUrl(input); }, [router.query.input, inputUrl]);
+  useEffect(() => { if (loggedIn) fetch(`/api/media-history?kind=${kind}`).then(r => r.json()).then(d => setMediaHistory(d.items || [])).catch(() => {}); }, [loggedIn, kind]);
 
   const generate = async () => {
     if (!loggedIn) { signIn(); return; }
@@ -87,7 +90,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) throw new Error(data.error || tr.mediaGenerateFailed);
       if (!data.url) throw new Error(tr.mediaNoResult);
-      setResult(data.url);
+      setResult(data.url); if (data.mediaItems) setMediaHistory(data.mediaItems.filter((x: MediaHistoryItem) => x.kind === kind));
     } catch (e: any) {
       setError(e?.message || tr.mediaRetryLater);
     }
@@ -166,6 +169,10 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
                 {!result && <div className="mt-4 rounded-2xl bg-slate-950 p-6 text-center text-sm leading-6 text-slate-400">{tr.resultPlaceholder}</div>}
                 {result && (kind === 'video' ? <video src={result} controls className="mt-4 w-full rounded-2xl" /> : <audio src={result} controls className="mt-4 w-full" />)}
                 {result && <a href={result} download={downloadName(kind)} className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white">⬇️ {tr.downloadResult}</a>}
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-sm">
+                <h2 className="text-base font-black text-slate-50">{tr.mediaHistory}</h2>
+                <div className="mt-4 max-h-64 space-y-2 overflow-auto">{mediaHistory.length === 0 && <div className="rounded-2xl bg-slate-950 p-4 text-sm text-slate-500">{tr.noMediaHistory}</div>}{mediaHistory.map(item => <button key={item.id || item.url} onClick={() => setResult(item.url)} className="block w-full rounded-2xl bg-slate-950 p-3 text-left text-xs text-slate-400"><div className="truncate text-slate-200">{item.prompt || item.url}</div><div className="mt-1">{item.createdAt || ''}</div></button>)}</div>
               </div>
             </aside>
           </div>

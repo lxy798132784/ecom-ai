@@ -119,7 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { image, action, scene, prompt, model: preferredModel, batch } = body;
+    const { image, action, scene, prompt, model: preferredModel, batch, batchCount } = body;
     const referenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.filter((x: any) => typeof x === 'string') : [];
     const generationOptions: ImageGenerationOptions = { quality: normalizeQuality(body.quality), size: normalizeSize(body.size), outputFormat: body.output_format === 'webp' ? 'webp' : body.output_format === 'jpeg' ? 'jpeg' : 'png' };
     const pointsCost = calcImagePoints(generationOptions.quality, generationOptions.size);
@@ -140,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'text2img') {
       const textPrompt = body.prompt || body.text || scene || 'product photo';
       const result = batch
-        ? await dispatchBatch(textPrompt, undefined, generationOptions)
+        ? await dispatchBatch(`${textPrompt}\nGenerate ${Math.min(4, Math.max(1, Number(batchCount || 1)))} distinct strong options in one batch-style request.`, undefined, generationOptions)
         : await dispatchGeneration(textPrompt, preferredModel as any, generationOptions);
       url = result.url;
       meta = { provider: result.provider, model: result.model, cost: result.cost };

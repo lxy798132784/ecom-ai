@@ -98,6 +98,8 @@ export async function getGalleryItems(email: string, kind: ImageListKind, aliase
       provider: meta?.provider,
       quality: meta?.quality,
       size: meta?.size,
+      outputFormat: meta?.outputFormat,
+      referenceCount: typeof meta?.referenceCount === 'number' ? meta.referenceCount : undefined,
     } as GalleryItem;
   }));
   return metas;
