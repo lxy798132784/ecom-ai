@@ -108,7 +108,7 @@ export default function Home() {
   const tr = t[lang];
   const downloadUrl = resizedUrl || result;
   const userPlan = accountPlan || (session?.user as any)?.plan || 'free';
-  const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
+  const usageLeft = Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
 
   // Load history, favorites & credits on login
@@ -174,7 +174,7 @@ export default function Home() {
     if (action !== 'text2img' && !image) return;
     if (action === 'text2img' && !textPrompt.trim()) { setError(tr.pleaseFill); return; }
     if (!loggedIn) { setShowLogin(true); return; }
-    if (usageLeft <= 0 && credits <= 0 && userPlan !== 'pro') { setShowPay(true); return; }
+    if (usageLeft <= 0 && credits <= 0) { userPlan === 'pro' ? setError('PRO 本月 1000 张额度已用完') : setShowPay(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
@@ -292,6 +292,16 @@ export default function Home() {
     } catch {}
   };
 
+
+  const deleteFavoriteImage = async (url: string) => {
+    setFavorites(p => p.filter(x => x !== url));
+    try {
+      const res = await fetch('/api/favorites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const data = await res.json().catch(() => ({}));
+      if (data.favorites) setFavorites(uniqueImages(data.favorites));
+    } catch {}
+  };
+
   return (
     <>
       <Head>
@@ -316,7 +326,7 @@ export default function Home() {
               ) : loggedIn ? (
                 <>
                   {userPlan === 'pro' ? (
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge}</span>
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge} · {tr.freeLeft} {usageLeft} {tr.times}</span>
                   ) : (
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
                       {tr.freeLeft} {usageLeft === Infinity ? '∞' : usageLeft} {tr.times}{credits > 0 ? ` · 余 ${credits} 赠送` : ''}
@@ -514,7 +524,7 @@ export default function Home() {
                             fetch('/api/favorites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) })
                               .then(r => r.json()).then(d => { if (d.favorites) setFavorites(uniqueImages(d.favorites)); });
                           }} className="text-[11px] px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">{favorites.includes(url) ? '取消收藏' : '收藏'}</button>
-                          {viewMode==='history' && <button onClick={() => deleteHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100">删除</button>}
+                          <button onClick={() => viewMode==='history' ? deleteHistoryImage(url) : deleteFavoriteImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100">删除</button>
                         </div>
                         {viewMode==='history' && (
                           <button onClick={() => {
