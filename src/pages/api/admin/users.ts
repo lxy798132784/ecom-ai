@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../../../lib/adminAuth';
 import { normalizeEmail } from '../../../lib/users';
 import { canonicalImageId } from '../../../lib/imageStore';
+import { getCollections, saveCollections } from '../../../lib/collectionsStore';
+import { getMediaHistory, removeMediaHistory } from '../../../lib/mediaStore';
 
 interface StoredUser {
   id?: string;
@@ -107,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const user = sanitizeUser(raw, emailKey);
       const email = normalizeEmail(user.email);
       const aliases = userAliasKeys(usersHash, email, user.email);
-      const [freeUsage, proUsage, credits, history, favorites, deletedHistory, deletedFav] = await Promise.all([
+      const [freeUsage, proUsage, credits, history, favorites, deletedHistory, deletedFav, collections, mediaHistory] = await Promise.all([
         kv.get<number>(getUsageKey(email, month, 'free')).catch(() => 0),
         kv.get<number>(getUsageKey(email, month, 'pro')).catch(() => 0),
         kv.get<number>(`credits:${email}`).catch(() => 0),
@@ -115,6 +117,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         listKeysByOwner(['fav', 'favorites'], email, aliases.flatMap(e => [`fav:${e}`, `favorites:${e}`])).then(keys => Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => []))).then(parts => parts.flat())),
         deletedImageSets(email, 'history'),
         deletedImageSets(email, 'fav'),
+        getCollections(email).catch(() => []),
+        getMediaHistory(email).catch(() => []),
       ]);
       return {
         ...user,
@@ -127,6 +131,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         favorites: filterDeletedImages(favorites || [], deletedFav),
         historyCountPreview: filterDeletedImages(history || [], deletedHistory).length,
         favoritesCountPreview: filterDeletedImages(favorites || [], deletedFav).length,
+        collections,
+        mediaHistory,
       };
     }));
 
@@ -169,10 +175,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'DELETE') {
     const body = req.body || {};
     const email = normalizeEmail(body.email || '');
-    const kind = body.kind === 'favorites' ? 'favorites' : body.kind === 'history' ? 'history' : '';
+    const kind = body.kind === 'favorites' ? 'favorites' : body.kind === 'history' ? 'history' : body.kind === 'media' ? 'media' : body.kind === 'collection' ? 'collection' : '';
     const url = String(body.url || '');
     const id = String(body.id || '');
-    if (!email || !kind || (!url && !id)) return res.status(400).json({ error: '缺少 email、kind 或图片 ID' });
+    if (!email || !kind) return res.status(400).json({ error: '缺少 email 或 kind' });
+    if (kind === 'media') {
+      if (!id && !url) return res.status(400).json({ error: '缺少媒体 ID' });
+      await removeMediaHistory(email, id || url);
+      return res.json({ ok: true });
+    }
+    if (kind === 'collection') {
+      if (!id) return res.status(400).json({ error: '缺少收藏夹 ID' });
+      const current = await getCollections(email);
+      if (url) await saveCollections(email, current.map(c => c.id === id ? { ...c, urls: (c.urls || []).filter(x => x !== url), updatedAt: new Date().toISOString() } : c));
+      else await saveCollections(email, current.filter(c => c.id !== id));
+      return res.json({ ok: true });
+    }
+    if (!url && !id) return res.status(400).json({ error: '缺少图片 ID' });
     await deleteImageEverywhere(email, kind, url, id || undefined);
     return res.json({ ok: true });
   }

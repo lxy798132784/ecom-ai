@@ -55,7 +55,7 @@ async function imageDeletePayload(url: string) {
   const id = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
   return { id, url: url.startsWith('data:') || url.length > 2000 ? undefined : url };
 }
-async function resizeImg(file: File): Promise<string> {
+async function resizeImg(file: File, quality = 0.9): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -63,7 +63,7 @@ async function resizeImg(file: File): Promise<string> {
       if (w > 1536 || h > 1536) { const r = Math.min(1536 / w, 1536 / h); w = Math.round(w * r); h = Math.round(h * r); }
       const c = document.createElement('canvas'); c.width = w; c.height = h;
       c.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      resolve(c.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.9));
+      resolve(c.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality));
     };
     img.onerror = reject; img.src = URL.createObjectURL(file);
   });
@@ -115,7 +115,8 @@ export default function Home() {
   const [detailItem, setDetailItem] = useState<GalleryItem | null>(null);
   const [dateFilter, setDateFilter] = useState<'all'|'today'|'week'>('all');
   const [sizeFilter, setSizeFilter] = useState('all');
-  const [batchCount, setBatchCount] = useState<1|2|4>(1);
+  const [batchCount, setBatchCount] = useState(1);
+  const [compressionQuality, setCompressionQuality] = useState(0.9);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [genQuality, setGenQuality] = useState<'low'|'medium'|'high'>('medium');
@@ -179,8 +180,8 @@ export default function Home() {
   const onDrop = useCallback((accepted: File[]) => {
     if (!accepted.length) return;
     setError(tr.compressing);
-    Promise.all(accepted.map(f => resizeImg(f))).then(dataUrls => { setReferences(prev => uniqueImages([...prev, ...dataUrls]).slice(0, 12)); setActiveRef(dataUrls[0]); setSelectedRefUrls(prev => uniqueImages([...prev, ...dataUrls]).slice(0, 12)); setError(''); }).catch(() => setError(tr.failed));
-  }, [tr.compressing, tr.failed]);
+    Promise.all(accepted.map(f => resizeImg(f, compressionQuality))).then(dataUrls => { setReferences(prev => uniqueImages([...prev, ...dataUrls]).slice(0, 12)); setActiveRef(dataUrls[0]); setSelectedRefUrls(prev => uniqueImages([...prev, ...dataUrls]).slice(0, 12)); setError(''); }).catch(() => setError(tr.failed));
+  }, [tr.compressing, tr.failed, compressionQuality]);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': ['.png','.jpg','.jpeg','.webp','.gif'] }, maxFiles: 12 });
 
   const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); setLang(next); };
@@ -203,7 +204,7 @@ export default function Home() {
     setTasks(p => [{ id, prompt: effectivePrompt || scene, action: mode, status: 'running' as const, inputUrl: primaryReference, createdAt: Date.now() }, ...p].slice(0, 50));
     setLoading(true); setError(''); setResult(null);
     try {
-      const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: primaryReference, action, scene, prompt: effectivePrompt, customPrompt: effectivePrompt, quality: genQuality, size: genSize, output_format: outputFormat, referenceImages: selectedReferenceImages, batch: batchCount > 1, batchCount }) });
+      const res = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: primaryReference, action, scene, prompt: effectivePrompt, customPrompt: effectivePrompt, quality: genQuality, size: genSize, output_format: outputFormat, referenceImages: selectedReferenceImages, batch: batchCount > 1, batchCount: Math.min(12, Math.max(1, Number(batchCount) || 1)), compressionQuality }) });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error(tr.apiEmptyUrl);
@@ -255,7 +256,7 @@ export default function Home() {
             <Link href="/video" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-300 hover:text-white">🎬 {tr.videoTool}</Link>
             <Link href="/audio" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-300 hover:text-white">🎙️ {tr.audioTool}</Link>
             <Link href="/voice-clone" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-300 hover:text-white">🗣️ {tr.voiceCloneTool}</Link>
-            <Link href="/blog" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-400">Blog</Link>
+            <Link href="/manual" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-300 hover:text-white">📘 {tr.manual}</Link><Link href="/blog" className="rounded-full border border-white/10 px-3 py-1.5 text-slate-400">Blog</Link>
           </nav>
           <div className="flex items-center gap-2 text-xs">
             <button onClick={toggleLang} className="rounded-lg border border-white/10 px-2 py-1">{lang === 'zh' ? 'EN' : '中'}</button>
@@ -278,7 +279,7 @@ export default function Home() {
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
         <section className="space-y-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+          <div id="create" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.creationPanel}</h2><span className="rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{tr.estimatedCost.replace('{points}', String(pointsCost))}</span></div>
             <div className="mb-4 grid grid-cols-2 gap-2">{(['text','edit','background','scene','mask','agent'] as StudioMode[]).map(m => <button key={m} onClick={() => setMode(m)} className={`rounded-2xl border px-3 py-3 text-sm ${mode === m ? 'border-brand-500 bg-brand-600 text-white' : 'border-white/10 bg-white/5 text-slate-300'}`}>{modeIcon(m)} {tr[`mode_${m}`]}</button>)}</div>
             {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={5} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={4} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" />}
@@ -289,21 +290,34 @@ export default function Home() {
             <button onClick={submit} disabled={loading} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? tr.generatingShort : tr.generate}</button>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+          <div id="references" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.referencePanel}</h2><button onClick={clearReferences} disabled={!references.length} className="text-xs text-slate-400 disabled:opacity-40">{tr.clearAllRefs}</button></div>
             <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center ${isDragActive ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-slate-950'}`}><input {...getInputProps()} /><div className="mb-2 text-3xl">🖼️</div><div className="text-sm font-medium">{tr.multiReferenceUpload}</div><div className="mt-1 text-xs text-slate-500">PNG · JPG · WEBP · GIF</div></div>
             {references.length > 0 && <><div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><button onClick={selectAllReferences} className="rounded-full border border-white/10 px-2 py-1">{tr.selectAllRefs}</button><button onClick={() => setSelectedRefUrls([])} className="rounded-full border border-white/10 px-2 py-1">{tr.clearSelectedRefs}</button><span className="text-slate-500">{tr.selectedRefs.replace('{count}', String(selectedReferenceImages.length))}</span></div><div className="mt-3 grid grid-cols-4 gap-2">{references.map((url, i) => <div key={url} className={`relative overflow-hidden rounded-xl border ${selectedRefUrls.includes(url) ? 'border-emerald-400 ring-2 ring-emerald-400/25' : activeRef === url ? 'border-brand-400 ring-2 ring-brand-400/25' : 'border-white/10'}`}><button onClick={() => { setActiveRef(url); toggleReferenceSelection(url); }} className="block w-full"><img src={url} className="aspect-square w-full object-cover" alt="" /></button><button onClick={() => removeReference(url)} className="absolute right-1 top-1 h-5 w-5 rounded-full bg-black/70 text-xs text-white">×</button><span className="absolute left-1 top-1 rounded bg-black/70 px-1 text-[10px]">{selectedRefUrls.includes(url) ? '✓' : i + 1}</span><button onClick={() => setActiveRef(url)} className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px]">{tr.primaryRef}</button></div>)}</div></>}
             <div className="mt-2 text-xs text-slate-400">{selectedReferenceImages.length ? tr.multiReferenceReady.replace('{count}', String(selectedReferenceImages.length)) : tr.noActiveReference}</div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-bold">{tr.generationSpec}</h2><p className="mt-1 text-xs text-slate-500">{tr.specHint}</p></div><span className="rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{pointsCost} × {batchCount}</span></div><div className="space-y-3"><div><p className="mb-1 text-xs text-slate-500">{tr.quality}</p><div className="grid grid-cols-3 gap-2">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality === q.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div className="font-semibold">{tr[q.labelKey]}</div><div className="text-[10px] opacity-70">×{q.mult}</div></button>)}</div></div><div><p className="mb-1 text-xs text-slate-500">{tr.resolution}</p><div className="grid grid-cols-3 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-left text-[11px] ${genSize === sz.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div className="font-semibold">{sz.label.split(' · ')[0]}</div><div className="text-[10px] opacity-70">{sz.label.split(' · ')[1]}</div></button>)}</div></div><div className="grid grid-cols-2 gap-3"><div><p className="mb-1 text-xs text-slate-500">{tr.outputFormat}</p><div className="grid grid-cols-3 gap-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-xl border px-2 py-2 text-xs uppercase ${outputFormat === f ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}>{f}</button>)}</div></div><div><p className="mb-1 text-xs text-slate-500">{tr.batchCount}</p><div className="grid grid-cols-3 gap-1">{([1,2,4] as const).map(n => <button key={n} onClick={() => setBatchCount(n)} className={`rounded-xl border px-2 py-2 text-xs ${batchCount === n ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}>{n}</button>)}</div></div></div></div></div>
+          <div id="specs" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="font-bold">{tr.generationSpec}</h2><p className="mt-1 text-xs text-slate-500">{tr.specHint}</p></div><span className="rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{pointsCost} × {batchCount}</span></div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div><p className="mb-1 text-xs text-slate-500">{tr.quality}</p><div className="grid grid-cols-3 gap-1">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality === q.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div className="font-semibold">{tr[q.labelKey]}</div><div className="text-[10px] opacity-70">×{q.mult}</div></button>)}</div></div>
+              <div><p className="mb-1 text-xs text-slate-500">{tr.resolution}</p><div className="grid grid-cols-3 gap-1">{SIZE_OPTIONS.slice(0,6).map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-left text-[11px] ${genSize === sz.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div className="font-semibold">{sz.label.split(' · ')[0]}</div><div className="text-[10px] opacity-70">{sz.label.split(' · ')[1]}</div></button>)}</div></div>
+              <div><p className="mb-1 text-xs text-slate-500">{tr.outputFormat}</p><div className="grid grid-cols-3 gap-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-xl border px-2 py-2 text-xs uppercase ${outputFormat === f ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}>{f}</button>)}</div><label className="mt-2 block text-xs text-slate-500">{tr.compressionQuality}: {Math.round(compressionQuality * 100)}%</label><input type="range" min={0.5} max={1} step={0.05} value={compressionQuality} onChange={e => setCompressionQuality(Number(e.target.value))} className="mt-1 w-full" /></div>
+              <div><p className="mb-1 text-xs text-slate-500">{tr.batchCount}</p><input type="number" min={1} max={12} value={batchCount} onChange={e => setBatchCount(Math.min(12, Math.max(1, Number(e.target.value) || 1)))} className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm" /><div className="mt-2 text-[11px] leading-4 text-slate-500">{tr.batchHint}</div></div>
+            </div>
+          </div>
+          <div className="grid gap-2 text-xs text-slate-400">
+            <details className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"><summary className="cursor-pointer font-semibold text-slate-200">{tr.helpSpecTitle}</summary><p className="mt-2 leading-5">{tr.helpSpecDesc}</p></details>
+            <details className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"><summary className="cursor-pointer font-semibold text-slate-200">{tr.helpReferenceTitle}</summary><p className="mt-2 leading-5">{tr.helpReferenceDesc}</p></details>
+            <Link href="/manual" className="rounded-2xl border border-brand-400/30 bg-brand-500/10 p-3 font-semibold text-brand-200">📘 {tr.manual}</Link>
+          </div>
         </section>
 
         <section className="space-y-4">
           <div className="min-h-[280px] rounded-3xl border border-white/10 bg-white/[0.04] p-4">{loading && <div className="p-12 text-center"><div className="mb-3 animate-bounce text-5xl">🎨</div><div>{tr.generating}</div><div className="mt-1 text-xs text-slate-500">{tr.waitSeconds}</div></div>}{!loading && result && <div><div className="mb-3 flex items-center justify-between"><h2 className="font-bold">✅ {tr.done}</h2><div className="flex flex-wrap gap-2 text-xs"><button onClick={() => addReferenceFromGallery(result)} className="rounded-full bg-white/10 px-3 py-1">{tr.useAsReference}</button><button onClick={() => toggleFavorite(result)} className="rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-200">{favoriteUrls.includes(result) ? tr.unfavorite : tr.favorite}</button><button onClick={() => downloadAs(result, outputFormat, 'image-studio-result')} className="rounded-full bg-slate-100 px-3 py-1 text-slate-900">⬇️ {tr.download}</button><button onClick={() => setResult(null)}>{tr.clear}</button></div></div><img src={result} className="max-h-[720px] w-full rounded-2xl bg-slate-950 object-contain" alt="" /></div>}{!loading && !result && <div className="p-16 text-center text-slate-500"><div className="mb-4 text-7xl">🧠</div><div className="font-medium text-slate-300">{tr.emptyStudioTitle}</div><div className="mt-2 text-sm">{tr.emptyStudioDesc}</div></div>}</div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-bold">{tr.taskStatus}</h2><p className="text-xs text-slate-500">{tr.taskStatusDesc}</p></div><div className="flex gap-2 text-xs"><select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="rounded-xl border border-white/10 bg-slate-950 px-2 py-2"><option value="all">{tr.allStatus}</option><option value="running">{tr.statusRunning}</option><option value="done">{tr.statusDone}</option><option value="error">{tr.statusError}</option></select><button onClick={() => setTasks([])} className="rounded-xl border border-white/10 px-3 py-2 text-slate-400">{tr.clearTasks}</button></div></div><div className="max-h-48 space-y-2 overflow-auto">{tasks.length === 0 && <div className="text-sm text-slate-500">{tr.noTasks}</div>}{tasks.map(task => <div key={task.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950 p-3 text-sm"><div className="min-w-0"><div className="truncate">{task.prompt || tr.noPrompt}</div><div className="text-xs text-slate-500">{tr[`mode_${task.action}`]} · {task.status === 'running' ? tr.statusRunning : task.status === 'done' ? tr.statusDone : tr.statusError}</div></div>{task.outputUrl && <button onClick={() => setResult(task.outputUrl!)} className="text-xs text-brand-300">{tr.view}</button>}</div>)}</div></div>
           {agentMessages.length > 0 && <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4"><h2 className="mb-3 font-bold">🤖 {tr.agentConversation}</h2><div className="max-h-56 space-y-2 overflow-auto">{agentMessages.map(m => <div key={m.id} className={`rounded-2xl p-3 text-sm ${m.role === 'user' ? 'bg-brand-500/10' : 'bg-slate-950'}`}><div className="mb-1 text-xs text-slate-500">{m.role}</div><div>{m.content}</div>{m.imageUrl && <button onClick={() => setResult(m.imageUrl!)} className="mt-2 text-xs text-brand-300">{tr.view}</button>}</div>)}</div></div>}
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+          <div id="gallery" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-center">
               <div><h2 className="font-bold">{tr.galleryTitle}</h2><p className="text-xs text-slate-500">{tr.galleryDescGeneric}</p></div>
               <div className="flex flex-wrap gap-2">
@@ -336,6 +350,7 @@ export default function Home() {
 
         <aside className="space-y-4 lg:col-span-2 xl:col-span-1">
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4"><h2 className="font-bold">{tr.mediaSuiteTitle}</h2><p className="mt-2 text-xs leading-5 text-slate-500">{tr.mediaSuiteDesc}</p><div className="mt-4 space-y-2">{mediaTools.map(tool => <div key={tool.key} className="rounded-2xl border border-white/10 bg-slate-950 p-3"><div className="flex items-center justify-between"><div className="font-semibold">{tool.icon} {tool.label}</div><span className={`text-[11px] ${tool.ready ? 'text-emerald-300' : 'text-amber-300'}`}>{tool.ready ? tr.configured : tr.pendingConfig}</span></div><p className="mt-1 text-xs text-slate-500">{tool.desc}</p><div className="mt-3 flex gap-2 text-xs"><Link href={tool.href} className="rounded-lg border border-white/10 px-2 py-1 text-slate-300">{tr.openTool}</Link>{result && <Link href={withResult(tool.href)} className="rounded-lg bg-brand-600 px-2 py-1 text-white">{tr.useCurrentResult}</Link>}</div></div>)}</div></div>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4"><h2 className="font-bold">{tr.workspaceStatus}</h2><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.selectedRefsLabel}</div><div className="mt-1 text-xl font-bold text-slate-100">{selectedReferenceImages.length}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.batchCount}</div><div className="mt-1 text-xl font-bold text-slate-100">{batchCount}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.galleryTitle}</div><div className="mt-1 text-xl font-bold text-slate-100">{historyItems.length + favoriteItems.length}</div></div><div className="rounded-2xl bg-slate-950 p-3"><div className="text-slate-500">{tr.compressionQuality}</div><div className="mt-1 text-xl font-bold text-slate-100">{Math.round(compressionQuality * 100)}%</div></div></div></div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-xs leading-5 text-slate-500">{tr.mediaPolishNote}</div>
         </aside>
       </div>

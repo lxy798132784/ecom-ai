@@ -19,6 +19,8 @@ type AdminUser = {
   favorites?: string[];
   historyCountPreview?: number;
   favoritesCountPreview?: number;
+  collections?: { id: string; name: string; urls: string[] }[];
+  mediaHistory?: { id: string; kind: string; url: string; prompt?: string; createdAt?: string }[];
 };
 
 async function imageHash(url: string) {
@@ -157,6 +159,25 @@ export default function AdminPage() {
     }
   };
 
+  const exportUserData = (user: AdminUser) => {
+    const blob = new Blob([JSON.stringify(user, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `user-${user.email}.json`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const deleteUserMedia = async (user: AdminUser, item: { id?: string; url: string }) => {
+    if (!confirm(tr.confirmDeleteUserMedia.replace('{email}', user.email))) return;
+    const prev = users; setUsers(list => list.map(u => u.email === user.email ? { ...u, mediaHistory: (u.mediaHistory || []).filter(x => x.id !== item.id && x.url !== item.url) } : u));
+    try { const res = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, kind: 'media', id: item.id, url: item.url }) }); if (!res.ok) throw new Error(tr.deleteFailed); setMessage(tr.imageDeleted); } catch (e: any) { setUsers(prev); setError(e.message || tr.deleteFailed); }
+  };
+
+  const deleteUserCollection = async (user: AdminUser, id: string, url = '') => {
+    if (!confirm(tr.confirmDeleteUserCollection.replace('{email}', user.email))) return;
+    const prev = users;
+    setUsers(list => list.map(u => u.email === user.email ? { ...u, collections: url ? (u.collections || []).map(c => c.id === id ? { ...c, urls: (c.urls || []).filter(x => x !== url) } : c) : (u.collections || []).filter(c => c.id !== id) } : u));
+    try { const res = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, kind: 'collection', id, url }) }); if (!res.ok) throw new Error(tr.deleteFailed); setMessage(tr.imageDeleted); } catch (e: any) { setUsers(prev); setError(e.message || tr.deleteFailed); }
+  };
+
 
   if (!loggedIn) {
     return <>
@@ -219,15 +240,15 @@ export default function AdminPage() {
                     <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} {tr.times} · pro {u.proUsage || 0} {tr.times}</div></td>
                     <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
-                    <td className="p-3 text-xs text-slate-500">{tr.historyCount.replace('{count}', String(u.history?.length || 0))}<br/>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</td>
+                    <td className="p-3 text-xs text-slate-500">{tr.historyCount.replace('{count}', String(u.history?.length || 0))}<br/>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}<br/>{tr.collectionsCount.replace('{count}', String(u.collections?.length || 0))}<br/>{tr.mediaCount.replace('{count}', String(u.mediaHistory?.length || 0))}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
                     <td className="p-3 space-y-2">
                       <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">{tr.saveAll}</button>
-                      <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button>
+                      <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button><button onClick={() => exportUserData(u)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{tr.exportData}</button>
                     </td>
                   </tr>
                   {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={9} className="p-4">
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
                       <div>
                         <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.historyImages} ({u.history?.length || 0})</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.history || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="history" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `history-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'history', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
@@ -235,6 +256,14 @@ export default function AdminPage() {
                       <div>
                         <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.favoriteImages} ({u.favorites?.length || 0})</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.favorites || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="favorite" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `favorite-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'favorites', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.collections} ({u.collections?.length || 0})</h4>
+                        <div className="space-y-2">{(u.collections || []).map(c => <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><div className="flex items-center justify-between gap-2"><div className="font-semibold text-slate-700">{c.name}</div><button onClick={() => deleteUserCollection(u, c.id)} className="rounded bg-red-50 px-2 py-1 text-red-600">{tr.delete}</button></div><div className="mt-1 text-slate-500">{c.urls?.length || 0} images</div><div className="mt-2 grid grid-cols-3 gap-1">{(c.urls || []).slice(0, 6).map(url => <div key={url} className="relative"><img src={url} className="aspect-square rounded object-cover" alt=""/><button onClick={() => deleteUserCollection(u, c.id, url)} className="absolute right-0 top-0 rounded bg-black/60 px-1 text-white">×</button></div>)}</div></div>)}</div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.mediaHistory} ({u.mediaHistory?.length || 0})</h4>
+                        <div className="space-y-2">{(u.mediaHistory || []).map(m => <div key={m.id || m.url} className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><div className="font-semibold text-slate-700">{m.kind}</div><div className="line-clamp-2 text-slate-500">{m.prompt || m.url}</div><div className="mt-2 flex gap-1"><button onClick={() => window.open(m.url, '_blank')} className="rounded bg-slate-100 px-2 py-1">{tr.open}</button><button onClick={() => copyImageLink(m.url)} className="rounded bg-slate-100 px-2 py-1">{tr.copy}</button><button onClick={() => deleteUserMedia(u, m)} className="rounded bg-red-50 px-2 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
                       </div>
                     </div>
                   </td></tr>}
