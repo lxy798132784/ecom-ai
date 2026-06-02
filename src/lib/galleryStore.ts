@@ -17,6 +17,8 @@ export type GalleryItem = {
   provider?: string;
   quality?: string;
   size?: string;
+  outputFormat?: string;
+  referenceCount?: number;
 };
 
 const MAX_ITEMS = 100;

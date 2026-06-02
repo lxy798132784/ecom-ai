@@ -5,6 +5,7 @@ import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneratio
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
 import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS, calcImagePoints, normalizeQuality, normalizeSize } from '../../lib/pricing';
 import { addGalleryImage, itemUrls } from '../../lib/galleryStore';
+import sharp from 'sharp';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -53,6 +54,33 @@ async function checkAvailable(email: string, plan: string, pointsCost: number) {
   return { allowed: false, limit: FREE_LIMIT, usage: freeUsage, freeUsage, proUsage: await getUsage(email, 'pro'), credits, plan, pointsCost, error: `积分不足：本次需要 ${pointsCost} 积分，免费剩余 ${Math.max(0, FREE_LIMIT - freeUsage)}，升级包剩余 ${credits}` };
 }
 
+
+function dataUrlToBuffer(input: string): Buffer | null {
+  const match = String(input || '').match(/^data:image\/\w+;base64,(.+)$/);
+  if (!match) return null;
+  return Buffer.from(match[1], 'base64');
+}
+
+async function composeReferenceBoard(primary: string, references: string[] = []): Promise<string> {
+  const imgs = Array.from(new Set([primary, ...references].filter(Boolean))).slice(0, 6);
+  if (imgs.length <= 1) return primary;
+  const buffers = imgs.map(dataUrlToBuffer).filter((x): x is Buffer => Boolean(x));
+  if (buffers.length <= 1) return primary;
+  const cell = 512;
+  const cols = Math.min(3, buffers.length);
+  const rows = Math.ceil(buffers.length / cols);
+  const composites = await Promise.all(buffers.map(async (buf, idx) => ({
+    input: await sharp(buf).resize(cell, cell, { fit: 'inside', background: { r: 15, g: 23, b: 42, alpha: 1 } }).extend({ top: 8, bottom: 8, left: 8, right: 8, background: { r: 15, g: 23, b: 42, alpha: 1 } }).png().toBuffer(),
+    left: (idx % cols) * cell,
+    top: Math.floor(idx / cols) * cell,
+  })));
+  const out = await sharp({ create: { width: cols * cell, height: rows * cell, channels: 4, background: { r: 15, g: 23, b: 42, alpha: 1 } } })
+    .composite(composites)
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${out.toString('base64')}`;
+}
+
 async function chargeAfterSuccess(email: string, availability: Awaited<ReturnType<typeof checkAvailable>>) {
   if (!availability.allowed) return availability;
   if (availability.paidWith === 'pro') {
@@ -92,6 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { image, action, scene, prompt, model: preferredModel, batch } = body;
+    const referenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.filter((x: any) => typeof x === 'string') : [];
     const generationOptions: ImageGenerationOptions = { quality: normalizeQuality(body.quality), size: normalizeSize(body.size), outputFormat: body.output_format === 'webp' ? 'webp' : body.output_format === 'jpeg' ? 'jpeg' : 'png' };
     const pointsCost = calcImagePoints(generationOptions.quality, generationOptions.size);
 
@@ -106,6 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let url = '';
     let meta: any = {};
+    const editImage = action === 'text2img' ? '' : await composeReferenceBoard(image, referenceImages);
 
     if (action === 'text2img') {
       const textPrompt = body.prompt || body.text || scene || 'product photo';
@@ -115,12 +145,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       url = result.url;
       meta = { provider: result.provider, model: result.model, cost: result.cost };
     } else if (action === 'custom') {
-      url = await customEdit(image, prompt || body.customPrompt || 'enhance this product photo', generationOptions);
+      url = await customEdit(editImage, prompt || body.customPrompt || 'enhance this image using all visible references consistently', generationOptions);
     } else if (action === 'whitebg') {
-      url = await removeBackground(image, prompt || '', generationOptions);
+      url = await removeBackground(editImage, prompt || '', generationOptions);
     } else if (action === 'scene') {
       if (!scene) return res.status(400).json({ error: 'Scene required' });
-      url = await generateLifestyleScene(image, scene, prompt || '', generationOptions);
+      url = await generateLifestyleScene(editImage, scene, prompt || '', generationOptions);
     } else {
       return res.status(400).json({ error: 'Unknown action' });
     }
@@ -137,6 +167,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         provider: meta.provider,
         quality: generationOptions.quality,
         size: generationOptions.size,
+        outputFormat: generationOptions.outputFormat,
+        referenceCount: referenceImages.length + (image ? 1 : 0),
       });
     } catch (e: any) {
       console.error('history write failed', e);
