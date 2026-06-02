@@ -22,7 +22,7 @@ export default function ManualPage() {
     { icon: '⚙️', title: tr.manualStep3Title, desc: tr.manualStep3Desc, href: '/#specs', action: tr.manualStep3Action },
     { icon: '🎨', title: tr.manualStep4Title, desc: tr.manualStep4Desc, href: '/#gallery', action: tr.manualStep4Action },
     { icon: '🎬', title: tr.manualStep5Title, desc: tr.manualStep5Desc, href: '/video', action: tr.manualStep5Action },
-    { icon: '🛠️', title: tr.manualStep6Title, desc: tr.manualStep6Desc, href: '/admin', action: tr.manualStep6Action },
+    { icon: '💾', title: tr.manualStep6Title, desc: tr.manualStep6Desc, href: '/#gallery', action: tr.manualStep6Action },
   ];
   return <>
     <Head><title>{tr.manual} - Image Studio AI</title></Head>
