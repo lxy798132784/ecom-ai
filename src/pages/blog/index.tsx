@@ -3,10 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import Head from 'next/head';
 import { useEffect, useMemo, useState } from 'react';
+import { BlogVisual } from '../../components/BlogVisual';
 import { getBlogZh, BlogLang } from '../../lib/blogBilingual';
 
 interface Post {
-  slug: string; title: string; date: string; category: string; description: string; titleZh?: string; categoryZh?: string; descriptionZh?: string;
+  slug: string; title: string; date: string; category: string; description: string; titleZh?: string | null; categoryZh?: string | null; descriptionZh?: string | null;
 }
 
 function fallbackDescription(title?: string, content?: string): string {
@@ -24,6 +25,7 @@ export default function BlogIndex({ posts }: { posts: Post[] }) {
   const [lang, setLang] = useState<BlogLang>('zh');
   useEffect(() => { setLang((localStorage.getItem('lang') as BlogLang) || 'zh'); }, []);
   const viewPosts = useMemo(() => posts.map(p => ({ ...p, viewTitle: lang === 'zh' ? (p.titleZh || p.title) : p.title, viewCategory: lang === 'zh' ? (p.categoryZh || p.category) : p.category, viewDescription: lang === 'zh' ? (p.descriptionZh || p.description) : p.description })), [posts, lang]);
+  const featured = viewPosts[0];
   return (
     <>
       <Head>
@@ -32,21 +34,35 @@ export default function BlogIndex({ posts }: { posts: Post[] }) {
         <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/blog`} />
       </Head>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12 px-4">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="flex items-start justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800 mb-2">📝 {lang === 'zh' ? 'EcomPic 博客' : 'EcomPic Blog'}</h1>
-              <p className="text-slate-500">{lang === 'zh' ? 'AI 产品摄影指南与电商图片运营技巧' : 'AI Product Photography Guides & Tips'}</p>
+              <h1 className="text-4xl font-bold text-slate-800 mb-2">📝 {lang === 'zh' ? 'EcomPic 博客' : 'EcomPic Blog'}</h1>
+              <p className="text-slate-500">{lang === 'zh' ? 'AI 产品摄影指南、电商图片 SEO、平台要求与可执行清单' : 'AI product photography guides, image SEO, marketplace requirements, and practical checklists'}</p>
             </div>
             <button onClick={() => { const next = lang === 'zh' ? 'en' : 'zh'; setLang(next); localStorage.setItem('lang', next); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:border-brand-400">{lang === 'zh' ? 'EN' : '中文'}</button>
           </div>
-          <div className="grid gap-6">
-            {viewPosts.map(p => (
-              <a key={p.slug} href={`/blog/${p.slug}`} className="block bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:border-brand-400 transition">
-                <span className="text-xs text-brand-500 font-medium">{p.viewCategory}</span>
-                <h2 className="text-lg font-semibold text-slate-800 mt-1">{p.viewTitle}</h2>
-                <p className="text-sm text-slate-500 mt-2">{p.viewDescription}</p>
-                <span className="text-xs text-slate-400 mt-3 block">{p.date}</span>
+          {featured && (
+            <a href={`/blog/${featured.slug}`} className="mb-8 grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:border-brand-400 md:grid-cols-[1.15fr_0.85fr]">
+              <BlogVisual title={featured.viewTitle} category={featured.viewCategory} slug={featured.slug} size="hero" />
+              <div className="p-7 flex flex-col justify-center">
+                <span className="text-xs font-semibold text-brand-500">{lang === 'zh' ? '精选指南' : 'Featured guide'} · {featured.viewCategory}</span>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">{featured.viewTitle}</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{featured.viewDescription}</p>
+                <span className="mt-5 text-sm font-semibold text-brand-600">{lang === 'zh' ? '阅读全文 →' : 'Read guide →'}</span>
+              </div>
+            </a>
+          )}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {viewPosts.slice(1).map(p => (
+              <a key={p.slug} href={`/blog/${p.slug}`} className="group overflow-hidden rounded-2xl bg-white shadow-sm border border-slate-200 hover:border-brand-400 transition">
+                <BlogVisual title={p.viewTitle} category={p.viewCategory} slug={p.slug} size="card" />
+                <div className="p-5">
+                  <span className="text-xs text-brand-500 font-medium">{p.viewCategory}</span>
+                  <h2 className="text-lg font-semibold text-slate-800 mt-1 group-hover:text-brand-700">{p.viewTitle}</h2>
+                  <p className="text-sm text-slate-500 mt-2 line-clamp-3">{p.viewDescription}</p>
+                  <span className="text-xs text-slate-400 mt-3 block">{p.date}</span>
+                </div>
               </a>
             ))}
           </div>
