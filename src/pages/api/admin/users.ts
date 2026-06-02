@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { kv } from '@vercel/kv';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { requireAdmin } from '../../../lib/adminAuth';
 import { normalizeEmail } from '../../../lib/users';
+import { canonicalImageId } from '../../../lib/imageStore';
 
 interface StoredUser {
   id?: string;
@@ -17,8 +17,7 @@ interface StoredUser {
 
 
 function imageId(url: string) {
-  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
-  return crypto.createHash('sha256').update(canonical || String(url || '')).digest('hex');
+  return canonicalImageId(url);
 }
 
 function cleanList(items: unknown[]): string[] {

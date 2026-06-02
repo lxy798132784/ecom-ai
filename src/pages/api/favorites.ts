@@ -1,18 +1,17 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
-import crypto from 'crypto';
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
 import { normalizeEmail } from '../../lib/users';
+import { canonicalImageId, persistGeneratedImage } from '../../lib/imageStore';
 
 function cleanList(items: unknown[]): string[] {
   return Array.from(new Set((items || []).map(x => String(x || '')).filter(Boolean)));
 }
 
 function imageId(url: string) {
-  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
-  return crypto.createHash('sha256').update(canonical || String(url || '')).digest('hex');
+  return canonicalImageId(url);
 }
 
 async function replaceList(key: string, items: string[]) {
@@ -68,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: '缺少url' });
-    const target = String(url);
+    const target = await persistGeneratedImage(String(url));
     const targetId = imageId(target);
     const deleted = await getDeleted([email]);
     const existing = filterDeleted((await Promise.all(keys.map(k => kv.lrange(k, 0, 199).catch(() => [])))).flat(), deleted);

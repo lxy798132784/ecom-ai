@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
-import crypto from 'crypto';
 import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneration, dispatchBatch, ImageGenerationOptions } from '../../lib/ai';
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
 import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS, calcImagePoints, normalizeQuality, normalizeSize } from '../../lib/pricing';
+import { persistGeneratedImage, canonicalImageId } from '../../lib/imageStore';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -74,8 +74,7 @@ async function chargeAfterSuccess(email: string, availability: Awaited<ReturnTyp
 }
 
 function imageId(url: string) {
-  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
-  return crypto.createHash('sha256').update(canonical || String(url || '')).digest('hex');
+  return canonicalImageId(url);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -133,24 +132,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
 
-    const charged = await chargeAfterSuccess(email, usageCheck);
+    const storedUrl = await persistGeneratedImage(url);
+    if (!storedUrl) return res.status(500).json({ error: 'Image storage failed' });
 
     // 自动保存到用户历史：先去重再置顶，避免前端刷新或重复写入出现两张相同历史图。
     try {
-      const targetId = imageId(url);
+      const targetId = imageId(storedUrl);
       await Promise.all(historyOwnerKeys.flatMap(owner => [
-        kv.srem(`deleted:history:${owner}`, url).catch(() => 0),
+        kv.srem(`deleted:history:${owner}`, storedUrl).catch(() => 0),
         kv.srem(`deleted:history-id:${owner}`, targetId).catch(() => 0),
-        kv.lrem(`history:${owner}`, 0, url).catch(() => 0),
+        kv.lrem(`history:${owner}`, 0, storedUrl).catch(() => 0),
       ]));
       await Promise.all(historyOwnerKeys.map(async owner => {
         const historyKey = `history:${owner}`;
-        await kv.lpush(historyKey, url);
+        await kv.lpush(historyKey, storedUrl);
         await kv.ltrim(historyKey, 0, 99);
       }));
-    } catch {}
+    } catch (e: any) {
+      console.error('history write failed', e);
+      return res.status(500).json({ error: '历史图片保存失败，请稍后重试；本次不会重复扣积分' });
+    }
 
-    return res.json({ url, usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, ...meta });
+    const charged = await chargeAfterSuccess(email, usageCheck);
+
+    return res.json({ url: storedUrl, usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, storedImage: storedUrl !== url, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

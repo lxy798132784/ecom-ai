@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
-import crypto from 'crypto';
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
+import { canonicalImageId, persistGeneratedImage } from '../../lib/imageStore';
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 2000;
@@ -18,8 +18,7 @@ function cleanList(items: unknown[]): string[] {
 }
 
 function imageId(url: string) {
-  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
-  return crypto.createHash('sha256').update(canonical || String(url || '')).digest('hex');
+  return canonicalImageId(url);
 }
 
 async function replaceList(key: string, items: string[]) {
@@ -94,7 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const { url } = req.body;
     if (url) {
-      const target = String(url);
+      const target = await persistGeneratedImage(String(url));
       const targetId = imageId(target);
       await Promise.all(emailKeys.flatMap(e => [
         kv.srem(`deleted:history:${e}`, target).catch(() => 0),

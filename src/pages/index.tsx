@@ -209,7 +209,7 @@ export default function Home() {
     Promise.all(promises).then(dataUrls => {
       setImages(dataUrls);
       if (dataUrls.length === 1) setImage(dataUrls[0]);
-      setResult(null); setResults([]); setError('');
+      setResult(null); setError('');
     }).catch(() => setError('Failed'));
   }, []);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
