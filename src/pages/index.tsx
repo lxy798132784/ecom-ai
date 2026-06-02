@@ -78,9 +78,9 @@ const PRESETS = [
 ];
 
 const QUALITY_OPTIONS = [
-  { id: 'low', label: '低', mult: 1 },
-  { id: 'medium', label: '中', mult: 2 },
-  { id: 'high', label: '高', mult: 4 },
+  { id: 'low', labelKey: 'qualityLow', mult: 1 },
+  { id: 'medium', labelKey: 'qualityMedium', mult: 2 },
+  { id: 'high', labelKey: 'qualityHigh', mult: 4 },
 ] as const;
 const SIZE_OPTIONS = [
   { id: '1024x1024', label: '1:1 · 1024×1024', mult: 1 },
@@ -204,13 +204,13 @@ export default function Home() {
 
   const onDrop = useCallback((accepted: File[]) => {
     if (!accepted.length) return;
-    setError('Compressing...');
+    setError(t[getLang()].compressing);
     const promises = accepted.map(f => resizeImg(f));
     Promise.all(promises).then(dataUrls => {
       setImages(dataUrls);
       if (dataUrls.length === 1) setImage(dataUrls[0]);
       setResult(null); setError('');
-    }).catch(() => setError('Failed'));
+    }).catch(() => setError(t[getLang()].failed));
   }, []);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop, accept: { 'image/*': ['.png','.jpg','.jpeg','.webp'] }, maxFiles: 10,
@@ -220,7 +220,7 @@ export default function Home() {
     if (action !== 'text2img' && !image) return;
     if (action === 'text2img' && !textPrompt.trim()) { setError(tr.pleaseFill); return; }
     if (!loggedIn) { setShowLogin(true); return; }
-    if (usageLeft < pointsCost && credits < pointsCost) { userPlan === 'pro' ? setError('PRO 本月积分不足') : setShowPay(true); return; }
+    if (usageLeft < pointsCost && credits < pointsCost) { userPlan === 'pro' ? setError(tr.proMonthlyNotEnough) : setShowPay(true); return; }
     setLoading(true); setError(''); setResult('');
     try {
       const res = await fetch('/api/generate', {
@@ -229,7 +229,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
-      if (!data.url) throw new Error('API returned empty URL');
+      if (!data.url) throw new Error(tr.apiEmptyUrl);
       setResult(data.url); setResults(p => prependUnique(p, data.url));
       if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
       if (data.limit !== undefined) setUsageLimit(data.limit);
@@ -329,8 +329,8 @@ export default function Home() {
     setMode('upload');
     setImage(url);
     setResult(url);
-    setCustomEditPrompt(customEditPrompt || '保持商品主体一致，优化为更高级的电商产品图');
-    setError('已载入历史图，可直接白底、场景化或自由编辑');
+    setCustomEditPrompt(customEditPrompt || tr.remixDefaultPrompt);
+    setError(tr.loadedForRemix);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -343,11 +343,11 @@ export default function Home() {
       const payload = await imageDeletePayload(url);
       const res = await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) throw new Error(data.error || '删除失败');
+      if (!res.ok || data.error) throw new Error(data.error || tr.deleteFailed);
       if (data.history) setResults(uniqueImages(data.history));
     } catch (e: any) {
       setResults(prev);
-      setError(e?.message || '删除历史图片失败，请重试');
+      setError(e?.message || tr.deleteHistoryFailed);
     }
   };
 
@@ -358,11 +358,11 @@ export default function Home() {
       const payload = await imageDeletePayload(url);
       const res = await fetch('/api/favorites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) throw new Error(data.error || '删除失败');
+      if (!res.ok || data.error) throw new Error(data.error || tr.deleteFailed);
       if (data.favorites) setFavorites(uniqueImages(data.favorites));
     } catch (e: any) {
       setFavorites(prev);
-      setError(e?.message || '删除收藏图片失败，请重试');
+      setError(e?.message || tr.deleteFavoriteFailed);
     }
   };
 
@@ -370,7 +370,7 @@ export default function Home() {
     <>
       <Head>
         <title>{tr.brand} - AI Product Photography for Ecommerce</title>
-        <meta name="description" content="Generate ecommerce product photos, white backgrounds, lifestyle scenes, and marketplace-ready images with AI." />
+        <meta name="description" content={lang === 'zh' ? '用 AI 生成电商产品图、白底图、场景图和平台可用图片。' : 'Generate ecommerce product photos, white backgrounds, lifestyle scenes, and marketplace-ready images with AI.'} />
         <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/`} />
       </Head>
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -378,7 +378,7 @@ export default function Home() {
         <div className="bg-white border-b border-slate-200">
           <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
             <span className="font-bold text-slate-800">🛍️ {tr.brand}</span>
-            {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} 积分</span>)}
+            {loggedIn && credits > 0 && (<span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">💰 {credits} {tr.times}</span>)}
             <div className="flex items-center gap-3 text-sm">
               <a href="/blog" className="text-xs text-slate-500 hover:text-brand-600 transition">📚 Blog</a>
               {/* Lang toggle */}
@@ -393,7 +393,7 @@ export default function Home() {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge} · {tr.freeLeft} {usageLeft} {tr.times}</span>
                   ) : (
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                      {tr.freeLeft} {usageLeft} {tr.times}{credits > 0 ? ` · 积分包 ${credits} 积分` : ''}
+                      {tr.freeLeft} {usageLeft} {tr.times}{credits > 0 ? ` · ${tr.creditsPack} ${credits} ${tr.times}` : ''}
                     </span>
                   )}
                   {userPlan !== 'pro' && (
@@ -427,9 +427,9 @@ export default function Home() {
 
         <div className="max-w-6xl mx-auto px-4 mt-6">
           <div className="grid md:grid-cols-3 gap-4">
-            <a href="/video" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎬</div><div className="font-bold text-slate-900">AI 生视频</div><div className="text-xs text-slate-500 mt-1 leading-5">商品图转广告短视频，独立页面配置参数。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
-            <a href="/audio" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎙️</div><div className="font-bold text-slate-900">AI 生语音</div><div className="text-xs text-slate-500 mt-1 leading-5">商品文案转广告旁白，独立页面配置参数。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
-            <a href="/voice-clone" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🗣️</div><div className="font-bold text-slate-900">音色克隆</div><div className="text-xs text-slate-500 mt-1 leading-5">上传参考音频生成品牌配音。</div></div><span className="mt-3 text-xs font-semibold text-brand-600">进入页面 →</span></a>
+            <a href="/video" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎬</div><div className="font-bold text-slate-900">{tr.videoTool}</div><div className="text-xs text-slate-500 mt-1 leading-5">{tr.videoToolDesc}</div></div><span className="mt-3 text-xs font-semibold text-brand-600">{tr.enterPage}</span></a>
+            <a href="/audio" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🎙️</div><div className="font-bold text-slate-900">{tr.audioTool}</div><div className="text-xs text-slate-500 mt-1 leading-5">{tr.audioToolDesc}</div></div><span className="mt-3 text-xs font-semibold text-brand-600">{tr.enterPage}</span></a>
+            <a href="/voice-clone" className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition min-h-[132px] flex flex-col justify-between"><div><div className="text-2xl mb-3">🗣️</div><div className="font-bold text-slate-900">{tr.voiceCloneTool}</div><div className="text-xs text-slate-500 mt-1 leading-5">{tr.voiceCloneToolDesc}</div></div><span className="mt-3 text-xs font-semibold text-brand-600">{tr.enterPage}</span></a>
           </div>
         </div>
 
@@ -448,19 +448,19 @@ export default function Home() {
 
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-slate-600">⚙️ 生成规格</h3>
-                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded-full">预计消耗 {pointsCost} 积分</span>
+                  <h3 className="text-sm font-semibold text-slate-600">⚙️ {tr.generationSpec}</h3>
+                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded-full">{tr.estimatedCost.replace('{points}', String(pointsCost))}</span>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">质量</p>
-                    <div className="grid grid-cols-3 gap-2">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality===q.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{q.label} ×{q.mult}</button>)}</div>
+                    <p className="text-xs text-slate-400 mb-1">{tr.quality}</p>
+                    <div className="grid grid-cols-3 gap-2">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality===q.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{(tr as any)[q.labelKey]} ×{q.mult}</button>)}</div>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">分辨率</p>
+                    <p className="text-xs text-slate-400 mb-1">{tr.resolution}</p>
                     <div className="grid grid-cols-2 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-xs ${genSize===sz.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{sz.label} ×{sz.mult}</button>)}</div>
                   </div>
-                  <p className="text-[11px] text-slate-400">支持 1:1 / 16:9 / 9:16，多档位先低成本试稿，成功后再扣积分。</p>
+                  <p className="text-[11px] text-slate-400">{tr.specHint}</p>
                 </div>
               </div>
               {mode === 'upload' && (
@@ -479,7 +479,7 @@ export default function Home() {
                       {images.length > 1 && (
                         <button onClick={() => processBatch('whitebg')} disabled={loading}
                           className="w-full bg-slate-800 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:bg-slate-900 disabled:opacity-50 transition">
-                          {batchIndex >= 0 ? `🔄 ${batchIndex + 1}/${images.length}` : `📦 ${images.length} 张批量白底图`}
+                          {batchIndex >= 0 ? `🔄 ${batchIndex + 1}/${images.length}` : `📦 ${tr.batchWhiteBg.replace('{count}', String(images.length))}`}
                         </button>
                       )}
                       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
@@ -559,11 +559,11 @@ export default function Home() {
                     <span className="text-xs text-slate-300">|</span>
                     <button onClick={() => setFitMode(m => m === 'fill' ? 'fit' : 'fill')}
                       className={`text-xs px-2 py-1 rounded-lg border transition ${fitMode === 'fill' ? 'bg-slate-100 border-slate-300' : 'border-slate-200'}`}
-                      title={fitMode === 'fill' ? '铺满（裁边）' : '留白（完整）'}>
-                      {fitMode === 'fill' ? '📐 铺满' : '🖼️ 完整'}
+                      title={fitMode === 'fill' ? tr.fillCrop : tr.fitFull}>
+                      {fitMode === 'fill' ? '📐 ' + tr.fill : '🖼️ ' + tr.fit}
                     </button>
                     <select value={exportSize} className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none" onChange={e => resizeToSize(e.target.value)}>
-                      <option value="">原尺寸</option>
+                      <option value="">{tr.originalSize}</option>
                       <option value="amazon">Amazon 2000×2000</option>
                       <option value="ebay">eBay 1600×1600</option>
                       <option value="shopify">Shopify 2048×2048</option>
@@ -579,8 +579,8 @@ export default function Home() {
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                   <div className="flex items-center justify-between mb-3 gap-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-700">作品库</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">历史作品可复用、再编辑、收藏和删除，方便连续产出。</p>
+                      <h3 className="text-sm font-semibold text-slate-700">{tr.galleryTitle}</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">{tr.galleryDesc}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setViewMode('history')} className={`text-xs px-3 py-1.5 rounded-full border ${viewMode==='history'?'bg-brand-600 text-white border-brand-600':'bg-white text-slate-500 border-slate-200 hover:border-brand-300'}`}>📋 {tr.history} ({results.length})</button>
@@ -589,30 +589,30 @@ export default function Home() {
                   </div>
                   {viewMode==='history' && selectedResults.size > 0 && (
                     <div className="flex items-center justify-between bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 mb-3">
-                      <span className="text-xs text-brand-700">已选择 {selectedResults.size} 张</span>
+                      <span className="text-xs text-brand-700">{tr.selectedCount.replace('{count}', String(selectedResults.size))}</span>
                       <div className="flex gap-2">
                         <button onClick={async () => {
                           await Promise.all(Array.from(selectedResults).map((url, idx) => downloadOne(url, `ecompic-${idx + 1}.jpg`)));
                           setSelectedResults(new Set());
                         }} className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full">⬇️ {tr.downloadSelected}</button>
-                        <button onClick={() => selectedResults.forEach(url => deleteHistoryImage(url))} className="text-xs bg-red-500 text-white px-3 py-1 rounded-full">🗑️ 删除</button>
+                        <button onClick={() => selectedResults.forEach(url => deleteHistoryImage(url))} className="text-xs bg-red-500 text-white px-3 py-1 rounded-full">🗑️ {tr.delete}</button>
                       </div>
                     </div>
                   )}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {(viewMode==='history' ? results : favorites).map((url) => (
                       <div key={url} className="group relative bg-slate-50 rounded-xl p-2 border border-slate-200 hover:border-brand-400 transition">
-                        <button className="block w-full" onClick={() => useHistoryImage(url)} title="点击载入这张图">
-                          <img src={url} className="w-full aspect-square object-cover rounded-lg bg-white" alt="历史生成图" />
+                        <button className="block w-full" onClick={() => useHistoryImage(url)} title={tr.clickLoadImage}>
+                          <img src={url} className="w-full aspect-square object-cover rounded-lg bg-white" alt={tr.historyImageAlt} />
                         </button>
                         <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition bg-white/95 backdrop-blur rounded-lg p-1.5 shadow flex flex-wrap gap-1 justify-center">
-                          <button onClick={() => useHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200">查看</button>
-                          <button onClick={() => remixHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-brand-600 text-white hover:bg-brand-700">编辑/再生图</button>
+                          <button onClick={() => useHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200">{tr.view}</button>
+                          <button onClick={() => remixHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-brand-600 text-white hover:bg-brand-700">{tr.editRemix}</button>
                           <button onClick={() => {
                             fetch('/api/favorites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) })
                               .then(r => r.json()).then(d => { if (d.favorites) setFavorites(uniqueImages(d.favorites)); });
-                          }} className="text-[11px] px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">{favorites.includes(url) ? '取消收藏' : '收藏'}</button>
-                          <button onClick={() => viewMode==='history' ? deleteHistoryImage(url) : deleteFavoriteImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100">删除</button>
+                          }} className="text-[11px] px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">{favorites.includes(url) ? tr.unfavorite : tr.favorite}</button>
+                          <button onClick={() => viewMode==='history' ? deleteHistoryImage(url) : deleteFavoriteImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100">{tr.delete}</button>
                         </div>
                         {viewMode==='history' && (
                           <button onClick={() => {
@@ -645,29 +645,29 @@ export default function Home() {
             className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400"
             onKeyDown={e => e.key === 'Enter' && doLogin()} />
           <button onClick={doLogin} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">{tr.login}</button>
-          <button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); }} className="w-full text-center text-xs text-slate-400 hover:text-brand-600 mt-2">忘记密码？</button>
+          <button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); }} className="w-full text-center text-xs text-slate-400 hover:text-brand-600 mt-2">{tr.forgotPassword}</button>
           <p className="text-center text-sm text-slate-400 mt-3">
             {tr.noAccount} <button onClick={() => { setShowLogin(false); setShowRegister(true); }} className="text-brand-600 hover:underline">{tr.register}</button>
           </p>
         </Modal>
 
         {/* Forgot Password Modal */}
-        <Modal show={showForgot} title="🔑 忘记密码" onClose={() => setShowForgot(false)}>
+        <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => setShowForgot(false)}>
           {forgotSent ? (
             <div className="text-center">
               <p className="text-5xl mb-4">📧</p>
-              <p className="font-medium text-slate-700 mb-2">邮件已发送</p>
-              <p className="text-sm text-slate-500 mb-4">请检查 {forgotEmail} 的收件箱，点击链接重置密码（30 分钟有效）</p>
-              <button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold">返回登录</button>
+              <p className="font-medium text-slate-700 mb-2">{tr.emailSent}</p>
+              <p className="text-sm text-slate-500 mb-4">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p>
+              <button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold">{tr.backToLogin}</button>
             </div>
           ) : (
             <>
               {authError && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4">{authError}</div>}
-              <p className="text-sm text-slate-500 mb-4">输入注册邮箱，我们会发送重置链接</p>
-              <input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="注册邮箱" type="email"
+              <p className="text-sm text-slate-500 mb-4">{tr.forgotDesc}</p>
+              <input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email"
                 className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-brand-400" />
-              <button onClick={doForgot} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">发送重置链接</button>
-              <button onClick={() => { setShowForgot(false); setShowLogin(true); }} className="w-full mt-2 text-slate-400 text-sm">返回登录</button>
+              <button onClick={doForgot} className="w-full bg-brand-600 text-white py-3 rounded-xl font-semibold hover:bg-brand-700 transition">{tr.sendResetLink}</button>
+              <button onClick={() => { setShowForgot(false); setShowLogin(true); }} className="w-full mt-2 text-slate-400 text-sm">{tr.backToLogin}</button>
             </>
           )}
         </Modal>

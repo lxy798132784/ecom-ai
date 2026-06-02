@@ -1,6 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
+type MediaUploadText = {
+  reading: string;
+  releaseToUpload: string;
+  clickOrDrag: string;
+  defaultHint: string;
+};
+
 type MediaUploadProps = {
   label: string;
   description: string;
@@ -8,6 +15,7 @@ type MediaUploadProps = {
   value?: string;
   onChange: (dataUrl: string, fileName: string) => void;
   preview?: 'image' | 'audio';
+  text?: MediaUploadText;
 };
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -19,7 +27,7 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-export function MediaUpload({ label, description, accept, value, onChange, preview = 'image' }: MediaUploadProps) {
+export function MediaUpload({ label, description, accept, value, onChange, preview = 'image', text }: MediaUploadProps) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const onDrop = useCallback(async (files: File[]) => {
@@ -46,8 +54,8 @@ export function MediaUpload({ label, description, accept, value, onChange, previ
         <div className="flex min-h-[104px] items-center justify-center text-center">
           <div>
             <div className="mb-2 text-3xl">{preview === 'audio' ? '🎧' : '🖼️'}</div>
-            <p className="text-sm font-semibold text-slate-700">{busy ? '读取中...' : isDragActive ? '松开上传' : '点击或拖拽上传'}</p>
-            <p className="mt-1 text-xs text-slate-400">{name || '上传后会作为当前功能的参考素材'}</p>
+            <p className="text-sm font-semibold text-slate-700">{busy ? text?.reading : isDragActive ? text?.releaseToUpload : text?.clickOrDrag}</p>
+            <p className="mt-1 text-xs text-slate-400">{name || text?.defaultHint}</p>
           </div>
         </div>
       </div>

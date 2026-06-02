@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useEffect, useMemo, useState, Fragment } from 'react';
+import { t, Lang } from '../lib/i18n';
 
 type AdminUser = {
   id?: string;
@@ -41,6 +42,12 @@ function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function getLang(): Lang {
+  if (typeof window === 'undefined') return 'zh';
+  return (localStorage.getItem('lang') as Lang) || 'zh';
+}
+function saveLang(l: Lang) { localStorage.setItem('lang', l); }
+
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -53,6 +60,9 @@ export default function AdminPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [expandedEmail, setExpandedEmail] = useState('');
+  const [lang, setLangState] = useState<Lang>('zh');
+  const tr = t[lang];
+  const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); saveLang(next); };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -73,14 +83,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/users?month=${encodeURIComponent(month)}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '加载失败');
+      if (!res.ok) throw new Error(data.error || tr.failed);
       setUsers(data.users || []);
     } catch (e: any) {
-      setError(e.message || '加载失败');
+      setError(e.message || tr.failed);
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { loadSession().catch(() => {}); }, []);
+  useEffect(() => { setLangState(getLang()); loadSession().catch(() => {}); }, []);
   useEffect(() => { if (loggedIn) loadUsers().catch(() => {}); }, [month]);
 
   const login = async (e: React.FormEvent) => {
@@ -89,10 +99,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '登录失败');
+      if (!res.ok) throw new Error(data.error || tr.authError);
       setLoggedIn(true); setAdminEmail(data.email || email); setPassword('');
       await loadUsers();
-    } catch (e: any) { setError(e.message || '登录失败'); }
+    } catch (e: any) { setError(e.message || tr.authError); }
     setLoading(false);
   };
 
@@ -104,46 +114,46 @@ export default function AdminPage() {
   const updateUser = async (user: AdminUser, patch: Partial<AdminUser>) => {
     const next = { ...user, ...patch };
     setUsers(prev => prev.map(u => u.email === user.email ? next : u));
-    setMessage('保存中...'); setError('');
+    setMessage(tr.saving); setError('');
     try {
       const res = await fetch(`/api/admin/users?month=${encodeURIComponent(month)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email, plan: next.plan, credits: next.credits, usage: next.usage, name: next.name, newPassword: next.newPassword || '' }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '保存失败');
-      setUsers(prev => prev.map(u => u.email === user.email ? { ...next, newPassword: '', hasPassword: true, passwordHashPreview: next.newPassword ? '已重置' : next.passwordHashPreview } : u));
-      setMessage(`已保存 ${user.email}`);
+      if (!res.ok) throw new Error(data.error || tr.failed);
+      setUsers(prev => prev.map(u => u.email === user.email ? { ...next, newPassword: '', hasPassword: true, passwordHashPreview: next.newPassword ? tr.saved : next.passwordHashPreview } : u));
+      setMessage(tr.savedUser.replace('{email}', user.email));
     } catch (e: any) {
-      setError(e.message || '保存失败');
+      setError(e.message || tr.failed);
       await loadUsers();
     }
   };
 
 
   const deleteUserImage = async (user: AdminUser, kind: 'history' | 'favorites', url: string) => {
-    if (!confirm(`确定从 ${user.email} 删除这张${kind === 'history' ? '历史' : '收藏'}图片吗？`)) return;
+    if (!confirm(tr.confirmDeleteUserImage.replace('{email}', user.email).replace('{kind}', kind === 'history' ? tr.historyKind : tr.favoritesKind))) return;
     const id = await imageHash(url);
     const prev = users;
     setUsers(list => list.map(u => u.email === user.email ? { ...u, [kind]: (u[kind] || []).filter(x => x !== url) } : u));
-    setMessage('删除中...'); setError('');
+    setMessage(tr.deleting); setError('');
     try {
       const res = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, kind, id, url: url.length < 2000 ? url : '' }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '删除失败');
-      setMessage('图片已删除');
+      if (!res.ok) throw new Error(data.error || tr.deleteFailed);
+      setMessage(tr.imageDeleted);
     } catch (e: any) {
       setUsers(prev);
-      setError(e.message || '删除失败');
+      setError(e.message || tr.deleteFailed);
     }
   };
 
   const copyImageLink = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      setMessage('图片链接已复制');
+      setMessage(tr.imageLinkCopied);
     } catch {
-      setError('复制失败，请手动打开图片复制链接');
+      setError(tr.copyFailed);
     }
   };
 
@@ -153,12 +163,13 @@ export default function AdminPage() {
       <Head><title>EcomPic Admin</title><meta name="robots" content="noindex,nofollow" /></Head>
       <main className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <form onSubmit={login} className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 space-y-5">
-          <div><h1 className="text-2xl font-bold text-slate-900">EcomPic 后台</h1><p className="text-sm text-slate-500 mt-1">仅管理员账号可登录</p></div>
+          <div className="flex justify-end"><button type="button" onClick={toggleLang} className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">{lang === 'zh' ? 'EN' : '中'}</button></div>
+          <div><h1 className="text-2xl font-bold text-slate-900">{tr.adminLoginTitle}</h1><p className="text-sm text-slate-500 mt-1">{tr.adminLoginDesc}</p></div>
           {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="管理员邮箱" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
-          <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="管理员密码" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
-          <button disabled={loading} className="w-full rounded-xl bg-brand-600 text-white py-3 font-semibold hover:bg-brand-700 disabled:opacity-60">{loading ? '登录中...' : '登录后台'}</button>
-          <p className="text-xs text-slate-400">请使用管理员账号登录。如需开通或重置权限，请联系站点负责人。</p>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder={tr.adminEmail} className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
+          <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder={tr.adminPassword} className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500" />
+          <button disabled={loading} className="w-full rounded-xl bg-brand-600 text-white py-3 font-semibold hover:bg-brand-700 disabled:opacity-60">{loading ? tr.adminLoginLoading : tr.adminLoginButton}</button>
+          <p className="text-xs text-slate-400">{tr.adminLoginHelp}</p>
         </form>
       </main>
     </>;
@@ -169,60 +180,61 @@ export default function AdminPage() {
     <main className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-5">
         <header className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div><h1 className="text-2xl font-bold text-slate-900">EcomPic 管理后台</h1><p className="text-sm text-slate-500">当前管理员：{adminEmail}</p></div>
+          <div><h1 className="text-2xl font-bold text-slate-900">{tr.adminDashboardTitle}</h1><p className="text-sm text-slate-500">{tr.currentAdmin.replace('{email}', adminEmail)}</p></div>
           <div className="flex flex-wrap gap-2">
+            <button onClick={toggleLang} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-3 py-2 text-sm">{lang === 'zh' ? 'EN' : '中'}</button>
             <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm">刷新</button>
-            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-4 py-2 text-sm">退出</button>
+            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm">{tr.refresh}</button>
+            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-4 py-2 text-sm">{tr.logout}</button>
           </div>
         </header>
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">用户数</p><p className="text-2xl font-bold">{users.length}</p></div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.userCount}</p><p className="text-2xl font-bold">{users.length}</p></div>
           <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">PRO</p><p className="text-2xl font-bold">{users.filter(u => u.plan === 'pro').length}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">本月积分消耗</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">积分余额</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p></div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.monthUsage}</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p></div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.creditBalance}</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p></div>
         </section>
 
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜索邮箱、昵称、会员状态" className="w-full md:w-96 rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-brand-500" />
-            <div className="text-sm text-slate-500">{loading ? '加载中...' : `显示 ${filtered.length} / ${users.length}`}</div>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={tr.searchUsers} className="w-full md:w-96 rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-brand-500" />
+            <div className="text-sm text-slate-500">{loading ? tr.loading : tr.adminShowing.replace('{shown}', String(filtered.length)).replace('{total}', String(users.length))}</div>
           </div>
           {message && <div className="mx-4 mt-4 bg-green-50 text-green-700 text-sm rounded-xl p-3">{message}</div>}
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">账号 / 昵称</th><th className="text-left p-3">密码</th><th className="text-left p-3">会员</th><th className="text-left p-3">本月消耗</th><th className="text-left p-3">剩余积分</th><th className="text-left p-3">积分余额</th><th className="text-left p-3">作品</th><th className="text-left p-3">创建时间</th><th className="text-left p-3">操作</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">{tr.remainingCredits}</th><th className="text-left p-3">{tr.creditBalance}</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
               <tbody>
                 {filtered.map(u => <Fragment key={u.email}>
                   <tr className="border-t border-slate-100">
                     <td className="p-3"><div className="font-medium text-slate-800">{u.email}</div><input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} className="mt-1 w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs" /></td>
                     <td className="p-3">
-                      <div className="text-[11px] text-slate-400 mb-1">明文不可查看，只能重置</div>
-                      <input type="password" value={u.newPassword || ''} placeholder="输入新密码" onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
-                      <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || '已保存'}` : '未设置密码'}</div>
+                      <div className="text-[11px] text-slate-400 mb-1">{tr.passwordNoView}</div>
+                      <input type="password" value={u.newPassword || ''} placeholder={tr.newPassword} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
+                      <div className="text-[10px] text-slate-400 mt-1">{u.hasPassword ? `hash: ${u.passwordHashPreview || tr.saved}` : tr.noPassword}</div>
                     </td>
                     <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
-                    <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} 积分 · pro {u.proUsage || 0} 积分</div></td>
+                    <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} {tr.times} · pro {u.proUsage || 0} {tr.times}</div></td>
                     <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
-                    <td className="p-3 text-xs text-slate-500">历史 {u.history?.length || 0}<br/>收藏 {u.favorites?.length || 0}</td>
+                    <td className="p-3 text-xs text-slate-500">{tr.historyCount.replace('{count}', String(u.history?.length || 0))}<br/>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
                     <td className="p-3 space-y-2">
-                      <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">保存全部</button>
-                      <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? '收起图片' : '查看图片'}</button>
+                      <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">{tr.saveAll}</button>
+                      <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button>
                     </td>
                   </tr>
                   {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={9} className="p-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-600 mb-2">历史图片 ({u.history?.length || 0})</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.history || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="history" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">打开</button><button onClick={() => downloadImage(url, `history-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">下载</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">复制</button><button onClick={() => deleteUserImage(u, 'history', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">删除</button></div></div>)}</div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.historyImages} ({u.history?.length || 0})</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.history || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="history" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `history-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'history', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-600 mb-2">收藏图片 ({u.favorites?.length || 0})</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.favorites || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="favorite" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">打开</button><button onClick={() => downloadImage(url, `favorite-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">下载</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">复制</button><button onClick={() => deleteUserImage(u, 'favorites', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">删除</button></div></div>)}</div>
+                        <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.favoriteImages} ({u.favorites?.length || 0})</h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.favorites || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="favorite" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `favorite-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'favorites', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
                       </div>
                     </div>
                   </td></tr>}
