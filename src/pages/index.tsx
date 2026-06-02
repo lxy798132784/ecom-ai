@@ -56,6 +56,21 @@ const PRESETS = [
   { id: 'warm', l: { zh: '温馨暖调', en: 'Warm' }, p: 'warm tones, cozy, soft sunlight' },
 ];
 
+const QUALITY_OPTIONS = [
+  { id: 'low', label: '低', mult: 1 },
+  { id: 'medium', label: '中', mult: 2 },
+  { id: 'high', label: '高', mult: 4 },
+] as const;
+const SIZE_OPTIONS = [
+  { id: '1024x1024', label: '1024×1024', mult: 1 },
+  { id: '1920x1080', label: '1920×1080', mult: 2 },
+  { id: '2560x1440', label: '2560×1440', mult: 3 },
+  { id: '3840x2160', label: '3840×2160', mult: 5 },
+] as const;
+function calcPoints(quality: string, size: string) {
+  return (QUALITY_OPTIONS.find(x => x.id === quality)?.mult || 2) * (SIZE_OPTIONS.find(x => x.id === size)?.mult || 1);
+}
+
 function Modal({ show, title, onClose, children }: { show: boolean; title: string; onClose: () => void; children: any }) {
   if (!show) return null;
   return (
@@ -105,10 +120,13 @@ export default function Home() {
   const [resizedUrl, setResizedUrl] = useState('');
   const [fitMode, setFitMode] = useState<'fill'|'fit'>('fill');
   const [bgColor, setBgColor] = useState('#ffffff');
+  const [genQuality, setGenQuality] = useState<'low'|'medium'|'high'>('medium');
+  const [genSize, setGenSize] = useState<'1024x1024'|'1920x1080'|'2560x1440'|'3840x2160'>('1024x1024');
   const tr = t[lang];
   const downloadUrl = resizedUrl || result;
   const userPlan = accountPlan || (session?.user as any)?.plan || 'free';
   const usageLeft = Math.max(0, usageLimit - usageCount);
+  const pointsCost = calcPoints(genQuality, genSize);
   const loggedIn = status === 'authenticated';
 
   // Load history, favorites & credits on login
@@ -181,7 +199,7 @@ export default function Home() {
     try {
       const res = await fetch('/api/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, action, scene, prompt: promptOverride || '', customPrompt: promptOverride || '' }),
+        body: JSON.stringify({ image, action, scene, prompt: promptOverride || '', customPrompt: promptOverride || '', quality: genQuality, size: genSize }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
@@ -249,13 +267,16 @@ export default function Home() {
       setLoading(true); setError(''); setResult('');
       fetch('/api/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: images?.[batchIndex] || image, action, scene, prompt: promptOverride || '' }),
+        body: JSON.stringify({ image: images?.[batchIndex] || image, action, scene, prompt: promptOverride || '', quality: genQuality, size: genSize }),
       }).then(r => r.json()).then(data => {
         if (!data.url) throw new Error('empty');
         setResult(data.url); setResults(p => prependUnique(p, data.url));
-        if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
-        if (data.credits !== undefined) setCredits(data.credits);
         if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
+        if (data.limit !== undefined) setUsageLimit(data.limit);
+        if (data.plan === 'pro' && data.proUsage !== undefined) setUsageCount(data.proUsage);
+        else if (data.plan === 'free' && data.freeUsage !== undefined) setUsageCount(data.freeUsage);
+        else if (data.usage !== undefined) setUsageCount(data.usage);
+        if (data.credits !== undefined) setCredits(data.credits);
         setLoading(false);
         setTimeout(resolve, 2000);
       }).catch(() => { setLoading(false); setTimeout(resolve, 2000); });
@@ -378,6 +399,24 @@ export default function Home() {
           <div className="grid md:grid-cols-5 gap-6">
             {/* Left */}
             <div className="md:col-span-2 space-y-4">
+
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-600">⚙️ 生成规格</h3>
+                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded-full">本次消耗 {pointsCost} 积分</span>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">质量倍率</p>
+                    <div className="grid grid-cols-3 gap-2">{QUALITY_OPTIONS.map(q => <button key={q.id} onClick={() => setGenQuality(q.id)} className={`rounded-xl border px-2 py-2 text-xs ${genQuality===q.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{q.label} ×{q.mult}</button>)}</div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">分辨率倍率</p>
+                    <div className="grid grid-cols-2 gap-2">{SIZE_OPTIONS.map(sz => <button key={sz.id} onClick={() => setGenSize(sz.id)} className={`rounded-xl border px-2 py-2 text-xs ${genSize===sz.id?'bg-brand-600 text-white border-brand-600':'bg-slate-50 text-slate-600 border-slate-200'}`}>{sz.label} ×{sz.mult}</button>)}</div>
+                  </div>
+                  <p className="text-[11px] text-slate-400">gpt-image-2 原生支持 quality/size；16:9 高清会先用最接近原生比例生成，再按所选分辨率高清输出。</p>
+                </div>
+              </div>
               {mode === 'upload' && (
                 <>
                   <div {...getRootProps()} className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition bg-white ${isDragActive ? 'border-brand-500 bg-blue-50' : 'border-slate-300 hover:border-brand-400'}`}>

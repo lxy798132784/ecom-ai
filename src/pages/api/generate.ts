@@ -2,13 +2,14 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import { kv } from '@vercel/kv';
 import crypto from 'crypto';
-import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneration, dispatchBatch } from '../../lib/ai';
+import { removeBackground, generateLifestyleScene, customEdit, dispatchGeneration, dispatchBatch, ImageGenerationOptions } from '../../lib/ai';
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
+import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS, calcImagePoints, normalizeQuality, normalizeSize } from '../../lib/pricing';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
-const FREE_LIMIT = 5;
-const PRO_LIMIT = 1000;
+const FREE_LIMIT = FREE_MONTHLY_POINTS;
+const PRO_LIMIT = PRO_MONTHLY_POINTS;
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -30,30 +31,30 @@ async function getCredits(email: string): Promise<number> {
   return getNumber(`credits:${email}`);
 }
 
-async function checkAndIncrement(email: string, plan: string) {
+async function checkAndIncrement(email: string, plan: string, pointsCost: number) {
   const credits = await getCredits(email);
   if (plan === 'pro') {
     const usage = await getUsage(email, 'pro');
-    if (usage < PRO_LIMIT) {
-      await kv.incr(usageKey(email, 'pro'));
-      return { allowed: true, limit: PRO_LIMIT, usage: usage + 1, freeUsage: await getUsage(email, 'free'), proUsage: usage + 1, credits, paidWith: 'pro' as const, plan };
+    if (usage + pointsCost <= PRO_LIMIT) {
+      await kv.incrby(usageKey(email, 'pro'), pointsCost);
+      return { allowed: true, limit: PRO_LIMIT, usage: usage + pointsCost, freeUsage: await getUsage(email, 'free'), proUsage: usage + pointsCost, credits, paidWith: 'pro' as const, plan, pointsCost };
     }
-    return { allowed: false, limit: PRO_LIMIT, usage, freeUsage: await getUsage(email, 'free'), proUsage: usage, credits, plan, error: `PRO 本月额度已用完（${PRO_LIMIT} 张/月）` };
+    return { allowed: false, limit: PRO_LIMIT, usage, freeUsage: await getUsage(email, 'free'), proUsage: usage, credits, plan, pointsCost, error: `PRO 积分不足：本次需要 ${pointsCost} 积分，剩余 ${Math.max(0, PRO_LIMIT - usage)} 积分` };
   }
 
   const freeUsage = await getUsage(email, 'free');
-  if (freeUsage < FREE_LIMIT) {
-    await kv.incr(usageKey(email, 'free'));
-    return { allowed: true, limit: FREE_LIMIT, usage: freeUsage + 1, freeUsage: freeUsage + 1, proUsage: await getUsage(email, 'pro'), credits, paidWith: 'free' as const, plan };
+  if (freeUsage + pointsCost <= FREE_LIMIT) {
+    await kv.incrby(usageKey(email, 'free'), pointsCost);
+    return { allowed: true, limit: FREE_LIMIT, usage: freeUsage + pointsCost, freeUsage: freeUsage + pointsCost, proUsage: await getUsage(email, 'pro'), credits, paidWith: 'free' as const, plan, pointsCost };
   }
 
-  if (credits > 0) {
-    const nextCredits = Math.max(0, credits - 1);
+  if (credits >= pointsCost) {
+    const nextCredits = Math.max(0, credits - pointsCost);
     await kv.set(`credits:${email}`, nextCredits);
-    return { allowed: true, limit: FREE_LIMIT, usage: freeUsage, freeUsage, proUsage: await getUsage(email, 'pro'), credits: nextCredits, paidWith: 'credit' as const, plan };
+    return { allowed: true, limit: FREE_LIMIT, usage: freeUsage, freeUsage, proUsage: await getUsage(email, 'pro'), credits: nextCredits, paidWith: 'credit' as const, plan, pointsCost };
   }
 
-  return { allowed: false, limit: FREE_LIMIT, usage: freeUsage, freeUsage, proUsage: await getUsage(email, 'pro'), credits, plan, error: `免费额度已用完（${FREE_LIMIT} 次/月）` };
+  return { allowed: false, limit: FREE_LIMIT, usage: freeUsage, freeUsage, proUsage: await getUsage(email, 'pro'), credits, plan, pointsCost, error: `积分不足：本次需要 ${pointsCost} 积分，免费剩余 ${Math.max(0, FREE_LIMIT - freeUsage)}，升级包剩余 ${credits}` };
 }
 
 function imageId(url: string) {
@@ -79,14 +80,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { image, action, scene, prompt, model: preferredModel, batch } = body;
+    const generationOptions: ImageGenerationOptions = { quality: normalizeQuality(body.quality), size: normalizeSize(body.size) };
+    const pointsCost = calcImagePoints(generationOptions.quality, generationOptions.size);
 
     if (action !== 'text2img' && !image) {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    const usageCheck = await checkAndIncrement(email, plan);
+    const usageCheck = await checkAndIncrement(email, plan, pointsCost);
     if (!usageCheck.allowed) {
-      return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage, freeUsage: usageCheck.freeUsage, proUsage: usageCheck.proUsage, credits: usageCheck.credits, plan: usageCheck.plan });
+      return res.status(429).json({ error: usageCheck.error, limit: usageCheck.limit, usage: usageCheck.usage, freeUsage: usageCheck.freeUsage, proUsage: usageCheck.proUsage, credits: usageCheck.credits, plan: usageCheck.plan, pointsCost });
     }
 
     let url = '';
@@ -95,17 +98,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'text2img') {
       const textPrompt = body.prompt || body.text || scene || 'product photo';
       const result = batch
-        ? await dispatchBatch(textPrompt)
-        : await dispatchGeneration(textPrompt, preferredModel as any);
+        ? await dispatchBatch(textPrompt, undefined, generationOptions)
+        : await dispatchGeneration(textPrompt, preferredModel as any, generationOptions);
       url = result.url;
       meta = { provider: result.provider, model: result.model, cost: result.cost };
     } else if (action === 'custom') {
-      url = await customEdit(image, prompt || body.customPrompt || 'enhance this product photo');
+      url = await customEdit(image, prompt || body.customPrompt || 'enhance this product photo', generationOptions);
     } else if (action === 'whitebg') {
-      url = await removeBackground(image, prompt || '');
+      url = await removeBackground(image, prompt || '', generationOptions);
     } else if (action === 'scene') {
       if (!scene) return res.status(400).json({ error: 'Scene required' });
-      url = await generateLifestyleScene(image, scene, prompt || '');
+      url = await generateLifestyleScene(image, scene, prompt || '', generationOptions);
     } else {
       return res.status(400).json({ error: 'Unknown action' });
     }
@@ -122,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await kv.ltrim(historyKey, 0, 99);
     } catch {}
 
-    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, freeUsage: usageCheck.freeUsage, proUsage: usageCheck.proUsage, credits: usageCheck.credits, paidWith: usageCheck.paidWith, plan: usageCheck.plan, ...meta });
+    return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, freeUsage: usageCheck.freeUsage, proUsage: usageCheck.proUsage, credits: usageCheck.credits, paidWith: usageCheck.paidWith, plan: usageCheck.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

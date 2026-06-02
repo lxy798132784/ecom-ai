@@ -4,8 +4,8 @@ import { kv } from '@vercel/kv';
 import crypto from 'crypto';
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
 
-const FREE_LIMIT = 5;
-const PRO_LIMIT = 1000;
+const FREE_LIMIT = 10;
+const PRO_LIMIT = 2000;
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);

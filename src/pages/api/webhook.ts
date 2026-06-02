@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { kv } from '@vercel/kv';
 import crypto from 'crypto';
+import { normalizeEmail } from '../../lib/users';
 
 export const config = { api: { bodyParser: false } };
 
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const event = JSON.parse(rawBody);
     const eventName = event.meta?.event_name;
     const attrs = event.data?.attributes;
-    const email = attrs?.user_email || attrs?.customer_email;
+    const email = normalizeEmail(attrs?.user_email || attrs?.customer_email || '');
     const variantName = attrs?.variant_name || attrs?.product_name || '';
 
     if (!email) return res.status(400).json({ error: 'No email in event' });
@@ -46,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       // Add credits for one-time packs
-      const creditsMap: Record<string, number> = { '5': 5, '20': 20, '50': 50 };
+      const creditsMap: Record<string, number> = { '5': 50, '20': 200, '50': 500, '50 credits': 50, '200 credits': 200, '500 credits': 500 };
       for (const [key, amount] of Object.entries(creditsMap)) {
         if (variantName.includes(key)) {
           const creditsKey = `credits:${email}`;
