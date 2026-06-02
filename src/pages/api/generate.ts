@@ -7,7 +7,7 @@ import { normalizeEmail, findUserByEmail } from '../../lib/users';
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
 const FREE_LIMIT = 5;
-const PRO_LIMIT = 500;
+const PRO_LIMIT = 1000;
 
 async function getUsageKey(email: string) {
   const month = new Date().toISOString().slice(0, 7);
@@ -29,7 +29,7 @@ async function checkAndIncrement(email: string, plan: string) {
 
   if (usage < limit) {
     await kv.incr(usageKey);
-    return { allowed: true, limit, usage: usage + 1, credits: await getCredits(email), paidWith: 'monthly' as const };
+    return { allowed: true, limit, usage: usage + 1, credits: await getCredits(email), paidWith: 'monthly' as const, plan };
   }
 
   if (plan !== 'pro') {
@@ -37,11 +37,11 @@ async function checkAndIncrement(email: string, plan: string) {
     if (credits > 0) {
       const nextCredits = Math.max(0, credits - 1);
       await kv.set(`credits:${email}`, nextCredits);
-      return { allowed: true, limit, usage, credits: nextCredits, paidWith: 'credit' as const };
+      return { allowed: true, limit, usage, credits: nextCredits, paidWith: 'credit' as const, plan };
     }
   }
 
-  return { allowed: false, limit, usage, credits: await getCredits(email), error: `${plan === 'pro' ? 'PRO' : '免费'}额度已用完（${limit} 次/月）` };
+  return { allowed: false, limit, usage, credits: await getCredits(email), plan, error: `${plan === 'pro' ? 'PRO' : '免费'}额度已用完（${limit} 次/月）` };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

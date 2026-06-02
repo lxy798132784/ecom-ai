@@ -99,6 +99,7 @@ export default function Home() {
   const [usageCount, setUsageCount] = useState(0);
   const [usageLimit, setUsageLimit] = useState(5);
   const [credits, setCredits] = useState(0);
+  const [accountPlan, setAccountPlan] = useState<'free'|'pro'>('free');
   const [lang, setLangState] = useState<Lang>('zh');
   const [exportSize, setExportSize] = useState('');
   const [resizedUrl, setResizedUrl] = useState('');
@@ -106,7 +107,7 @@ export default function Home() {
   const [bgColor, setBgColor] = useState('#ffffff');
   const tr = t[lang];
   const downloadUrl = resizedUrl || result;
-  const userPlan = (session?.user as any)?.plan || 'free';
+  const userPlan = accountPlan || (session?.user as any)?.plan || 'free';
   const usageLeft = userPlan === 'pro' ? Infinity : Math.max(0, usageLimit - usageCount);
   const loggedIn = status === 'authenticated';
 
@@ -118,6 +119,7 @@ export default function Home() {
       if (d.credits !== undefined) setCredits(d.credits);
       if (d.usage !== undefined) setUsageCount(d.usage);
       if (d.limit !== undefined) setUsageLimit(d.limit);
+      if (d.plan === 'pro' || d.plan === 'free') setAccountPlan(d.plan);
     }).catch(() => {});
     fetch('/api/favorites').then(r => r.json()).then(d => {
       if (d.favorites) setFavorites(d.favorites);
@@ -185,6 +187,7 @@ export default function Home() {
       setResult(data.url); setResults(p => prependUnique(p, data.url));
       if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
       if (data.credits !== undefined) setCredits(data.credits);
+      if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   };
@@ -247,6 +250,7 @@ export default function Home() {
         setResult(data.url); setResults(p => prependUnique(p, data.url));
         if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
         if (data.credits !== undefined) setCredits(data.credits);
+        if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
         setLoading(false);
         setTimeout(resolve, 2000);
       }).catch(() => { setLoading(false); setTimeout(resolve, 2000); });
@@ -625,7 +629,7 @@ export default function Home() {
               <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">{tr.recommended}</span>
             </div>
             <div className="flex justify-between items-center mb-2"><span className="font-bold text-2xl">$19</span><span className="text-slate-400 text-sm">{tr.month}</span></div>
-            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}（500次/月）</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
+            <ul className="text-sm text-slate-600 space-y-1"><li>✅ {tr.unlimited}（1000次/月）</li><li>✅ {tr.allFeatures}</li><li>✅ {tr.prioritySupport}</li></ul>
             <a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener"
               className="block w-full bg-brand-600 text-white text-center py-2.5 rounded-xl font-semibold hover:bg-brand-700 transition mt-3 text-sm">
               💳 {tr.upgradeBtn}

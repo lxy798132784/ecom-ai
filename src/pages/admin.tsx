@@ -158,7 +158,7 @@ export default function AdminPage() {
                     </td>
                     <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
                     <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
-                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.plan === 'pro' ? '∞' : Math.max(0, 5 - Number(u.usage || 0))}</span></td>
+                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 1000 : 5) - Number(u.usage || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
                     <td className="p-3 text-xs text-slate-500">历史 {u.history?.length || 0}<br/>收藏 {u.favorites?.length || 0}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
