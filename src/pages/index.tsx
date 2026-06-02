@@ -117,9 +117,11 @@ export default function Home() {
     fetch('/api/history').then(r => r.json()).then(d => {
       if (d.history) setResults(uniqueImages(d.history));
       if (d.credits !== undefined) setCredits(d.credits);
-      if (d.usage !== undefined) setUsageCount(d.usage);
-      if (d.limit !== undefined) setUsageLimit(d.limit);
       if (d.plan === 'pro' || d.plan === 'free') setAccountPlan(d.plan);
+      if (d.limit !== undefined) setUsageLimit(d.limit);
+      if (d.plan === 'pro' && d.proUsage !== undefined) setUsageCount(d.proUsage);
+      else if (d.plan === 'free' && d.freeUsage !== undefined) setUsageCount(d.freeUsage);
+      else if (d.usage !== undefined) setUsageCount(d.usage);
     }).catch(() => {});
     fetch('/api/favorites').then(r => r.json()).then(d => {
       if (d.favorites) setFavorites(d.favorites);
@@ -185,9 +187,12 @@ export default function Home() {
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error('API returned empty URL');
       setResult(data.url); setResults(p => prependUnique(p, data.url));
-      if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
-      if (data.credits !== undefined) setCredits(data.credits);
       if (data.plan === 'pro' || data.plan === 'free') setAccountPlan(data.plan);
+      if (data.limit !== undefined) setUsageLimit(data.limit);
+      if (data.plan === 'pro' && data.proUsage !== undefined) setUsageCount(data.proUsage);
+      else if (data.plan === 'free' && data.freeUsage !== undefined) setUsageCount(data.freeUsage);
+      else if (data.usage !== undefined) setUsageCount(data.usage);
+      if (data.credits !== undefined) setCredits(data.credits);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   };
@@ -329,7 +334,7 @@ export default function Home() {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✨ {tr.proBadge} · {tr.freeLeft} {usageLeft} {tr.times}</span>
                   ) : (
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${usageLeft <= 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                      {tr.freeLeft} {usageLeft === Infinity ? '∞' : usageLeft} {tr.times}{credits > 0 ? ` · 余 ${credits} 赠送` : ''}
+                      {tr.freeLeft} {usageLeft} {tr.times}{credits > 0 ? ` · 升级包 ${credits} 张` : ''}
                     </span>
                   )}
                   {userPlan !== 'pro' && (

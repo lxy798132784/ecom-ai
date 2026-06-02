@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { kv } from '@vercel/kv';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { requireAdmin } from '../../../lib/adminAuth';
 import { normalizeEmail } from '../../../lib/users';
 
@@ -14,8 +15,32 @@ interface StoredUser {
   passwordHashPreview?: string;
 }
 
-function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7)) {
-  return `usage:${email}:${month}`;
+
+function imageId(url: string) {
+  const canonical = String(url || '').trim().split('#')[0].split('?')[0];
+  return crypto.createHash('sha256').update(canonical || String(url || '')).digest('hex');
+}
+
+function cleanList(items: unknown[]): string[] {
+  return Array.from(new Set((items || []).map(x => String(x || '')).filter(Boolean)));
+}
+
+async function deletedImageSets(email: string, kind: 'history' | 'fav') {
+  const urlKeys = kind === 'history' ? [`deleted:history:${email}`] : [`deleted:fav:${email}`, `deleted:favorites:${email}`];
+  const idKeys = kind === 'history' ? [`deleted:history-id:${email}`] : [`deleted:fav-id:${email}`, `deleted:favorites-id:${email}`];
+  const [urls, ids] = await Promise.all([
+    Promise.all(urlKeys.map(k => kv.smembers(k).catch(() => []))).then(parts => cleanList(parts.flat())),
+    Promise.all(idKeys.map(k => kv.smembers(k).catch(() => []))).then(parts => cleanList(parts.flat())),
+  ]);
+  return { urls: new Set(urls), ids: new Set(ids) };
+}
+
+function filterDeletedImages(items: unknown[], deleted: { urls: Set<string>; ids: Set<string> }) {
+  return cleanList(items).filter(url => !deleted.urls.has(url) && !deleted.ids.has(imageId(url))).slice(0, 100);
+}
+
+function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7), bucket: 'free' | 'pro' = 'free') {
+  return `usage:${bucket}:${email}:${month}`;
 }
 
 function sanitizeUser(user: any, fallbackEmail: string): StoredUser {
@@ -42,21 +67,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rows = await Promise.all(Object.entries(usersHash).map(async ([emailKey, raw]) => {
       const user = sanitizeUser(raw, emailKey);
       const email = normalizeEmail(user.email);
-      const [usage, credits, history, favorites] = await Promise.all([
-        kv.get<number>(getUsageKey(email, month)).catch(() => 0),
+      const [freeUsage, proUsage, credits, history, favorites, deletedHistory, deletedFav] = await Promise.all([
+        kv.get<number>(getUsageKey(email, month, 'free')).catch(() => 0),
+        kv.get<number>(getUsageKey(email, month, 'pro')).catch(() => 0),
         kv.get<number>(`credits:${email}`).catch(() => 0),
         kv.lrange(`history:${email}`, 0, 99).catch(() => []),
         kv.lrange(`fav:${email}`, 0, 99).catch(() => []),
+        deletedImageSets(email, 'history'),
+        deletedImageSets(email, 'fav'),
       ]);
       return {
         ...user,
         email,
-        usage: usage || 0,
+        usage: user.plan === 'pro' ? (proUsage || 0) : (freeUsage || 0),
+        freeUsage: freeUsage || 0,
+        proUsage: proUsage || 0,
         credits: credits || 0,
-        history: Array.from(new Set((history || []).filter(Boolean))),
-        favorites: Array.from(new Set((favorites || []).filter(Boolean))),
-        historyCountPreview: Array.isArray(history) ? Array.from(new Set(history.filter(Boolean))).length : 0,
-        favoritesCountPreview: Array.isArray(favorites) ? Array.from(new Set(favorites.filter(Boolean))).length : 0,
+        history: filterDeletedImages(history || [], deletedHistory),
+        favorites: filterDeletedImages(favorites || [], deletedFav),
+        historyCountPreview: filterDeletedImages(history || [], deletedHistory).length,
+        favoritesCountPreview: filterDeletedImages(favorites || [], deletedFav).length,
       };
     }));
 
@@ -88,7 +118,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (body.usage !== undefined) {
       const usage = Math.max(0, Number(body.usage) || 0);
-      await kv.set(getUsageKey(email, month), usage);
+      const bucket = nextUser.plan === 'pro' ? 'pro' : 'free';
+      await kv.set(getUsageKey(email, month, bucket), usage);
     }
 
     return res.json({ ok: true });
