@@ -2,8 +2,10 @@ import { GetStaticProps, GetStaticPaths } from 'next';
 import fs from 'fs';
 import path from 'path';
 import Head from 'next/head';
+import { useEffect, useMemo, useState } from 'react';
+import { getBlogZh, BlogLang } from '../../lib/blogBilingual';
 
-interface PostData { slug: string; title: string; date: string; category: string; description: string; content: string; }
+interface PostData { slug: string; title: string; date: string; category: string; description: string; content: string; titleZh?: string; categoryZh?: string; descriptionZh?: string; contentZh?: string; }
 
 function fallbackDescription(title?: string, content?: string): string {
   const plain = (content || '')
@@ -17,21 +19,27 @@ function fallbackDescription(title?: string, content?: string): string {
 }
 
 export default function BlogPost({ post }: { post: PostData }) {
+  const [lang, setLang] = useState<BlogLang>('zh');
+  useEffect(() => { setLang((localStorage.getItem('lang') as BlogLang) || 'zh'); }, []);
+  const view = useMemo(() => ({ title: lang === 'zh' ? (post?.titleZh || post?.title) : post?.title, category: lang === 'zh' ? (post?.categoryZh || post?.category) : post?.category, description: lang === 'zh' ? (post?.descriptionZh || post?.description) : post?.description, content: lang === 'zh' ? (post?.contentZh || post?.content) : post?.content }), [post, lang]);
   if (!post) return <div className="text-center py-20 text-slate-500">Post not found</div>;
   return (
     <>
       <Head>
-        <title>{post.title} - EcomPic Blog</title>
-        <meta name="description" content={post.description} />
+        <title>{view.title} - EcomPic Blog</title>
+        <meta name="description" content={view.description} />
         <link rel="canonical" href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ai-pixel.online'}/blog/${post.slug}`} />
       </Head>
       <main className="min-h-screen bg-white py-12 px-4">
         <article className="max-w-3xl mx-auto">
-          <a href="/blog" className="text-sm text-brand-500 hover:underline mb-4 block">← Back to Blog</a>
-          <span className="text-xs text-brand-500 font-medium">{post.category}</span>
-          <h1 className="text-3xl font-bold text-slate-800 mt-2 mb-2">{post.title}</h1>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <a href="/blog" className="text-sm text-brand-500 hover:underline">← {lang === 'zh' ? '返回博客' : 'Back to Blog'}</a>
+            <button onClick={() => { const next = lang === 'zh' ? 'en' : 'zh'; setLang(next); localStorage.setItem('lang', next); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:border-brand-400">{lang === 'zh' ? 'EN' : '中文'}</button>
+          </div>
+          <span className="text-xs text-brand-500 font-medium">{view.category}</span>
+          <h1 className="text-3xl font-bold text-slate-800 mt-2 mb-2">{view.title}</h1>
           <p className="text-sm text-slate-400 mb-8">{post.date}</p>
-          <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+          <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: view.content || '' }} />
         </article>
       </main>
     </>
@@ -79,7 +87,8 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
     });
     const body = fmMatch[2].trim();
     const description = meta.description || meta.excerpt || fallbackDescription(meta.title, body);
-    return { props: { post: { slug, title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(body).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' } } };
+    const zh = getBlogZh(slug);
+    return { props: { post: { slug, title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(body).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>', titleZh: zh?.title || null, categoryZh: zh?.category || null, descriptionZh: zh?.description || null, contentZh: zh ? '<p class="mb-4 leading-relaxed text-slate-700">' + mdToHtml(zh.content).replace(/^<p class="mb-4 leading-relaxed text-slate-700">/, '') + '</p>' : null } } };
   }
   return { props: { post: null } };
 };
