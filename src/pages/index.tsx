@@ -5,7 +5,7 @@ import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
 import { t, Lang } from '../lib/i18n';
 
-type Mode = 'upload' | 'text' | 'video' | 'audio' | 'voice';
+type Mode = 'upload' | 'text';
 
 function getLang(): Lang {
   if (typeof window === 'undefined') return 'zh';
@@ -115,7 +115,6 @@ export default function Home() {
   const [images, setImages] = useState<string[]>([]);
   const [batchIndex, setBatchIndex] = useState(-1);
   const [result, setResult] = useState<string | null>(null);
-  const [mediaResult, setMediaResult] = useState<{ kind: 'video' | 'audio' | 'voice-clone'; url: string } | null>(null);
   const [results, setResults] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
@@ -127,12 +126,6 @@ export default function Home() {
   const [selScene, setSelScene] = useState('');
   const [mode, setMode] = useState<Mode>('upload');
   const [textPrompt, setTextPrompt] = useState('');
-  const [mediaPrompt, setMediaPrompt] = useState('');
-  const [mediaStyle, setMediaStyle] = useState('');
-  const [mediaDuration, setMediaDuration] = useState(5);
-  const [mediaAspect, setMediaAspect] = useState('16:9');
-  const [voiceSample, setVoiceSample] = useState('');
-  const [mediaStatus, setMediaStatus] = useState<any>(null);
   const [customEditPrompt, setCustomEditPrompt] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -177,7 +170,6 @@ export default function Home() {
     fetch('/api/favorites').then(r => r.json()).then(d => {
       if (d.favorites) setFavorites(d.favorites);
     }).catch(() => {});
-    fetch('/api/media-status').then(r => r.json()).then(setMediaStatus).catch(() => {});
   }, [loggedIn]);
 
   const resizeToSize = (sizeKey: string) => {
@@ -318,23 +310,6 @@ export default function Home() {
   };
 
 
-  const generateMedia = async (kind: 'video' | 'audio' | 'voice-clone') => {
-    if (!mediaPrompt.trim()) { setError('请先填写要生成的内容描述'); return; }
-    if (!loggedIn) { setShowLogin(true); return; }
-    setLoading(true); setError(''); setMediaResult(null);
-    try {
-      const res = await fetch('/api/media', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, prompt: mediaPrompt, text: mediaPrompt, inputUrl: image || result || undefined, voiceSample: voiceSample || undefined, style: mediaStyle, duration: mediaDuration, aspectRatio: mediaAspect }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) throw new Error(`${data.error || '生成失败'}${data.requiredEnv ? `｜需配置：${data.requiredEnv.join(', ')}` : ''}`);
-      if (!data.url) throw new Error('服务商未返回媒体 URL');
-      setMediaResult({ kind, url: data.url });
-    } catch (e: any) { setError(e.message || '媒体生成失败'); }
-    setLoading(false);
-  };
-
   const doText = () => generate('text2img', '', textPrompt);
   const doWhiteBg = () => generate('whitebg', '', customPrompt);
   const doCustom = () => generate('custom', '', customEditPrompt);
@@ -450,49 +425,21 @@ export default function Home() {
           </div>
         )}
 
-        {/* Mode Tabs */}
-        <div className="flex justify-center mt-8 mb-4">
-          <div className="bg-slate-100 rounded-xl p-1 inline-flex">
-            {[
-              ['upload','📸',tr.upload], ['text','✍️',tr.textGen], ['video','🎬','生视频'], ['audio','🎙️','生语音'], ['voice','🗣️','音色克隆'],
-            ].map(([id, icon, label]) => (
-              <button key={id} onClick={() => setMode(id as Mode)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${mode === id ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>{icon} {label}</button>
-            ))}
+        <div className="max-w-6xl mx-auto px-4 mt-6">
+          <div className="grid md:grid-cols-3 gap-3">
+            <a href="/video" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🎬</div><div className="font-bold text-slate-900">AI 生视频</div><div className="text-xs text-slate-500 mt-1">商品图转广告短视频，独立页面配置参数。</div></a>
+            <a href="/audio" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🎙️</div><div className="font-bold text-slate-900">AI 生语音</div><div className="text-xs text-slate-500 mt-1">商品文案转广告旁白，独立页面配置参数。</div></a>
+            <a href="/voice-clone" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition"><div className="text-2xl mb-2">🗣️</div><div className="font-bold text-slate-900">音色克隆</div><div className="text-xs text-slate-500 mt-1">上传参考音频生成品牌配音。</div></a>
           </div>
         </div>
 
-        {(mode === 'video' || mode === 'audio' || mode === 'voice') && (
-          <div className="max-w-4xl mx-auto px-4 mb-6">
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">{mode === 'video' ? '🎬 AI 生视频' : mode === 'audio' ? '🎙️ AI 生语音' : '🗣️ 音色克隆'}</h2>
-                  <p className="text-sm text-slate-500 mt-1">功能入口已预备好；后期只要在 Vercel 配好对应 URL / Key / Model 即可启用。</p>
-                </div>
-                <span className={`text-xs px-3 py-1 rounded-full ${mode === 'video' ? (mediaStatus?.video?.configured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700') : mode === 'audio' ? (mediaStatus?.audio?.configured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700') : (mediaStatus?.voiceClone?.configured ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}`}>{mode === 'video' ? (mediaStatus?.video?.configured ? '已配置' : '待配置') : mode === 'audio' ? (mediaStatus?.audio?.configured ? '已配置' : '待配置') : (mediaStatus?.voiceClone?.configured ? '已配置' : '待配置')}</span>
-              </div>
-              <textarea value={mediaPrompt} onChange={e => setMediaPrompt(e.target.value)} rows={4}
-                placeholder={mode === 'video' ? '例如：把这张商品图做成 5 秒电商广告短视频，镜头缓慢推进，背景高级，突出质感...' : mode === 'audio' ? '例如：为这个商品生成 15 秒温暖高级的广告旁白，语气专业、有购买欲...' : '例如：用参考音色朗读这段商品广告文案，语气自然、有亲和力...'}
-                className="w-full text-sm border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-brand-400" />
-              <div className="grid md:grid-cols-3 gap-3 mt-3">
-                <input value={mediaStyle} onChange={e => setMediaStyle(e.target.value)} placeholder="风格：高级 / 温暖 / 科技 / 活泼" className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />
-                {mode === 'video' && <select value={mediaAspect} onChange={e => setMediaAspect(e.target.value)} className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none"><option>16:9</option><option>9:16</option><option>1:1</option></select>}
-                {(mode === 'video' || mode === 'audio') && <input type="number" min={3} max={60} value={mediaDuration} onChange={e => setMediaDuration(Number(e.target.value || 5))} className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none" placeholder="时长秒数" />}
-              </div>
-              {mode === 'voice' && <input value={voiceSample} onChange={e => setVoiceSample(e.target.value)} placeholder="参考音频 URL（后期也可接上传组件）" className="mt-3 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400" />}
-              <div className="flex flex-wrap gap-2 mt-4">
-                <button onClick={() => generateMedia(mode === 'video' ? 'video' : mode === 'audio' ? 'audio' : 'voice-clone')} disabled={loading}
-                  className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50">{loading ? '生成中...' : '开始生成'}</button>
-                <button onClick={() => setMediaPrompt(mode === 'video' ? 'Create a 5-second premium ecommerce product video, slow camera push-in, clean background, soft studio lighting, make the product feel desirable.' : mode === 'audio' ? 'Generate a warm premium ecommerce ad voiceover that makes the product feel trustworthy, useful, and worth buying.' : 'Clone the reference voice and read this ecommerce ad copy naturally with warmth and confidence.')} className="bg-slate-100 text-slate-700 px-4 py-3 rounded-xl text-sm font-semibold">套用高转化模板</button>
-                {(image || result) && mode === 'video' && <span className="text-xs text-slate-400 self-center">会自动带上当前图片作为视频参考图</span>}
-              </div>
-              {mediaResult && <div className="mt-5 rounded-2xl border border-slate-200 p-4 bg-slate-50">
-                {mediaResult.kind === 'video' ? <video src={mediaResult.url} controls className="w-full rounded-xl" /> : <audio src={mediaResult.url} controls className="w-full" />}
-                <a href={mediaResult.url} download className="inline-flex mt-3 bg-slate-900 text-white px-4 py-2 rounded-full text-sm">⬇️ 下载结果</a>
-              </div>}
-            </div>
+        {/* Mode Tabs */}
+        <div className="flex justify-center mt-8 mb-4">
+          <div className="bg-slate-100 rounded-xl p-1 inline-flex">
+            <button onClick={() => setMode('upload')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>📸 {tr.upload}</button>
+            <button onClick={() => setMode('text')} className={`px-5 py-2 rounded-lg text-sm font-medium transition ${mode === 'text' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>✍️ {tr.textGen}</button>
           </div>
-        )}
+        </div>
 
         <div className="max-w-6xl mx-auto px-4 pb-20">
           <div className="grid md:grid-cols-5 gap-6">

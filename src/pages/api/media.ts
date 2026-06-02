@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
-import { generateMedia, requiredEnv } from '../../lib/multimodal';
+import { generateMedia } from '../../lib/multimodal';
 
 export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
 
@@ -33,10 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       aspectRatio: String(body.aspectRatio || '16:9'),
     });
     if (!result.configured) {
-      return res.status(501).json({ error: '该功能已预留，等待 Vercel 配置服务商 URL 和 Key', requiredEnv: requiredEnv(kind) });
+      return res.status(501).json({ error: '该功能暂未启用，请稍后再试' });
     }
     return res.json({ ok: true, kind, ...result });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message || 'Media generation failed', requiredEnv: requiredEnv(kind) });
+    return res.status(500).json({ error: e.message || '生成失败，请稍后重试' });
   }
 }
