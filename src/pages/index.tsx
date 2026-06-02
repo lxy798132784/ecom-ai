@@ -291,17 +291,6 @@ export default function Home() {
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[440px_minmax(0,1fr)]">
         <section className="space-y-4">
-          <div id="create" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.creationPanel}</h2><span className="rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{tr.estimatedCost.replace('{points}', String(pointsCost))}</span></div>
-            <div className="mb-4 grid grid-cols-2 gap-2">{(['text','edit','background','scene','mask','agent'] as StudioMode[]).map(m => <button key={m} onClick={() => setMode(m)} className={`rounded-2xl border px-3 py-3 text-sm ${mode === m ? 'border-brand-500 bg-brand-600 text-white' : 'border-white/10 bg-white/5 text-slate-300'}`}>{modeIcon(m)} {tr[`mode_${m}`]}</button>)}</div>
-            {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={5} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={4} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" />}
-            <div className="mt-3 flex flex-wrap gap-2 text-xs"><button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300">{tr.templateCinematic}</button><button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300">{tr.templatePortrait}</button><button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300">{tr.templateProduct}</button></div>
-            {mode === 'mask' && <div className="mt-3 rounded-2xl border border-yellow-400/20 bg-yellow-500/10 p-3 text-xs text-yellow-100">🎭 {tr.maskModeHint}</div>}
-            {mode === 'agent' && <div className="mt-3 rounded-2xl border border-blue-400/20 bg-blue-500/10 p-3 text-xs text-blue-100">🤖 {tr.agentModeHint}</div>}
-            {mode === 'scene' && <div className="mt-3 grid grid-cols-3 gap-2">{SCENES.map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-xl border px-2 py-2 text-xs ${scene === s.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div>{s.e}</div>{lang === 'zh' ? s.zh : s.en}</button>)}</div>}
-            <button onClick={submit} disabled={loading} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? tr.generatingShort : tr.generate}</button>
-          </div>
-
           <div id="references" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">{tr.referencePanel}</h2><button onClick={clearReferences} disabled={!references.length} className="text-xs text-slate-400 disabled:opacity-40">{tr.clearAllRefs}</button></div>
             <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center ${isDragActive ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-slate-950'}`}><input {...getInputProps({ className: 'hidden' })} /><div className="mb-2 text-3xl">🖼️</div><div className="text-sm font-medium">{tr.multiReferenceUpload}</div><div className="mt-1 text-xs text-slate-500">PNG · JPG · WEBP · GIF</div></div>
@@ -309,7 +298,7 @@ export default function Home() {
             <div className="mt-2 text-xs text-slate-400">{selectedReferenceImages.length ? tr.multiReferenceReady.replace('{count}', String(selectedReferenceImages.length)) : tr.noActiveReference}</div>
           </div>
 
-          <div id="specs" className="rounded-3xl border border-white/[0.08] bg-[#0f1011] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+          <div id="specs" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div><h2 className="text-[15px] font-semibold tracking-[-0.02em] text-slate-100">{tr.generationSpec}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{tr.specHint}</p></div>
               <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-slate-300">{pointsCost * batchCount} pts</span>
@@ -327,7 +316,7 @@ export default function Home() {
 
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3">
                 <div className="mb-2 text-[11px] text-slate-500">{tr.outputFormat}</div>
-                <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/35 p-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide transition ${outputFormat === f ? 'bg-slate-100 text-slate-950 shadow-[0_0_0_1px_rgba(255,255,255,.18)_inset]' : 'text-slate-300 hover:bg-white/[0.09] hover:text-white'}`}>{f}</button>)}</div>
+                <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/35 p-1">{(['png','jpeg','webp'] as OutputFormat[]).map(f => <button key={f} onClick={() => setOutputFormat(f)} className={`rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide transition ${outputFormat === f ? 'bg-brand-600 text-white shadow-[0_0_0_1px_rgba(255,255,255,.12)_inset]' : 'text-slate-300 hover:bg-white/[0.08] hover:text-white'}`}>{f}</button>)}</div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -388,6 +377,23 @@ export default function Home() {
               </div>)}
             </div>
             {filteredItems.length === 0 && <div className="py-10 text-center text-sm text-slate-500">{tr.noImagesMatched}</div>}
+          </div>
+        </section>
+
+        <section className="lg:col-span-2">
+          <div id="create" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 md:p-5">
+            <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center"><div><h2 className="font-bold">{tr.creationPanel}</h2><p className="mt-1 text-xs text-slate-500">{tr.studioHeroDesc}</p></div><span className="w-fit rounded-full bg-brand-500/10 px-2 py-1 text-[11px] text-brand-200">{tr.estimatedCost.replace('{points}', String(pointsCost))}</span></div>
+            <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-2">{(['text','edit','background','scene','mask','agent'] as StudioMode[]).map(m => <button key={m} onClick={() => setMode(m)} className={`rounded-2xl border px-3 py-3 text-sm transition ${mode === m ? 'border-brand-500 bg-brand-600 text-white' : 'border-white/10 bg-white/[0.035] text-slate-300 hover:bg-white/[0.06] hover:text-white'}`}>{modeIcon(m)} {tr[`mode_${m}`]}</button>)}</div>
+              <div>
+                {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={5} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={5} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="w-full rounded-2xl border border-white/10 bg-slate-950 p-3 text-sm" />}
+                <div className="mt-3 flex flex-wrap gap-2 text-xs"><button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateCinematic}</button><button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templatePortrait}</button><button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-full border border-white/10 px-2 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateProduct}</button></div>
+                {mode === 'mask' && <div className="mt-3 rounded-2xl border border-yellow-400/20 bg-yellow-500/10 p-3 text-xs text-yellow-100">🎭 {tr.maskModeHint}</div>}
+                {mode === 'agent' && <div className="mt-3 rounded-2xl border border-blue-400/20 bg-blue-500/10 p-3 text-xs text-blue-100">🤖 {tr.agentModeHint}</div>}
+                {mode === 'scene' && <div className="mt-3 grid grid-cols-3 gap-2">{SCENES.map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-xl border px-2 py-2 text-xs ${scene === s.id ? 'border-brand-500 bg-brand-600' : 'border-white/10 bg-white/5'}`}><div>{s.e}</div>{lang === 'zh' ? s.zh : s.en}</button>)}</div>}
+                <button onClick={submit} disabled={loading} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? tr.generatingShort : tr.generate}</button>
+              </div>
+            </div>
           </div>
         </section>
 
