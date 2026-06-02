@@ -12,6 +12,14 @@ function getLang(): Lang {
   return (localStorage.getItem('lang') as Lang) || 'zh';
 }
 function setLang(l: Lang) { localStorage.setItem('lang', l); }
+function uniqueImages(items: string[]): string[] {
+  return Array.from(new Set((items || []).filter(Boolean)));
+}
+
+function prependUnique(items: string[], url: string): string[] {
+  return [url, ...items.filter(x => x !== url)].slice(0, 20);
+}
+
 
 function resizeImg(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -68,7 +76,7 @@ export default function Home() {
   const [result, setResult] = useState<string | null>(null);
   const [results, setResults] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [selectedResults, setSelectedResults] = useState<Set<number>>(new Set());
+  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'history'|'favorites'>('history');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -106,7 +114,7 @@ export default function Home() {
   useEffect(() => {
     if (!loggedIn) return;
     fetch('/api/history').then(r => r.json()).then(d => {
-      if (d.history) setResults(d.history);
+      if (d.history) setResults(uniqueImages(d.history));
       if (d.credits !== undefined) setCredits(d.credits);
     }).catch(() => {});
     fetch('/api/favorites').then(r => r.json()).then(d => {
@@ -172,8 +180,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.url) throw new Error('API returned empty URL');
-      setResult(data.url); setResults(p => [data.url, ...p]);
-      fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) }).catch(() => {});
+      setResult(data.url); setResults(p => prependUnique(p, data.url));
       if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -234,8 +241,7 @@ export default function Home() {
         body: JSON.stringify({ image: images?.[batchIndex] || image, action, scene, prompt: promptOverride || '' }),
       }).then(r => r.json()).then(data => {
         if (!data.url) throw new Error('empty');
-        setResult(data.url); setResults(p => [data.url, ...p]);
-        fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: data.url }) }).catch(() => {});
+        setResult(data.url); setResults(p => prependUnique(p, data.url));
         if (data.usage !== undefined) { setUsageCount(data.usage); setUsageLimit(data.limit); }
         setLoading(false);
         setTimeout(resolve, 2000);
@@ -247,6 +253,32 @@ export default function Home() {
   const doWhiteBg = () => generate('whitebg', '', customPrompt);
   const doCustom = () => generate('custom', '', customEditPrompt);
   const doScene = (sid: string) => { setSelScene(sid); generate('scene', sid, customPrompt); };
+
+  const useHistoryImage = (url: string) => {
+    setMode('upload');
+    setImage(url);
+    setResult(url);
+    setResizedUrl('');
+    setExportSize('');
+    setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const remixHistoryImage = (url: string) => {
+    setMode('upload');
+    setImage(url);
+    setResult(url);
+    setCustomEditPrompt(customEditPrompt || '保持商品主体一致，优化为更高级的电商产品图');
+    setError('已载入历史图，可直接白底、场景化或自由编辑');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteHistoryImage = async (url: string) => {
+    setResults(p => p.filter(x => x !== url));
+    setSelectedResults(p => { const next = new Set(p); next.delete(url); return next; });
+    if (result === url) setResult(null);
+    await fetch('/api/history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).catch(() => {});
+  };
 
   return (
     <>
@@ -426,36 +458,54 @@ export default function Home() {
                   <img src={downloadUrl || result} className="w-full rounded-xl shadow-md" alt="" />
                 </div>
               )}
-              {results.filter((_, i) => i > 0).length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-slate-500">
-                      <button onClick={() => setViewMode('history')} className={`mr-3 ${viewMode==='history'?'text-brand-600 underline':''}`}>📋 {tr.history} ({results.length})</button>
-                      <button onClick={() => setViewMode('favorites')} className={`${viewMode==='favorites'?'text-brand-600 underline':''}`}>⭐ {tr.favorites} ({favorites.length})</button>
-                    </h3>
-                    {viewMode==='history' && selectedResults.size > 0 && (
-                      <button onClick={() => {
-                        selectedResults.forEach(i => {
-                          const a = document.createElement('a'); a.href = results[i]; a.download = `ecompic-${Date.now()}-${i}.jpg`; a.click();
-                        });
-                        setSelectedResults(new Set());
-                      }} className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full">⬇️ {tr.downloadSelected} ({selectedResults.size})</button>
-                    )}
+              {(results.length > 0 || favorites.length > 0) && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-700">作品库</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">参考 Firefly / Canva / Midjourney：历史图可复用、再编辑、收藏、删除。</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setViewMode('history')} className={`text-xs px-3 py-1.5 rounded-full border ${viewMode==='history'?'bg-brand-600 text-white border-brand-600':'bg-white text-slate-500 border-slate-200 hover:border-brand-300'}`}>📋 {tr.history} ({results.length})</button>
+                      <button onClick={() => setViewMode('favorites')} className={`text-xs px-3 py-1.5 rounded-full border ${viewMode==='favorites'?'bg-brand-600 text-white border-brand-600':'bg-white text-slate-500 border-slate-200 hover:border-brand-300'}`}>⭐ {tr.favorites} ({favorites.length})</button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(viewMode==='history' ? results.filter((_, i) => i > 0) : favorites).map((url, i) => (
-                      <div key={i} className="relative">
-                        <div className={`bg-white rounded-xl p-2 shadow-sm border-2 cursor-pointer hover:border-brand-400 ${selectedResults.has(i) ? 'border-brand-500' : 'border-slate-200'}`} onClick={() => {
-                          if (viewMode==='history') { const s = new Set(selectedResults); s.has(i) ? s.delete(i) : s.add(i); setSelectedResults(s); } else { setResult(url); }
-                        }}>
-                          <img src={url} className="w-full rounded-lg" alt="" />
+                  {viewMode==='history' && selectedResults.size > 0 && (
+                    <div className="flex items-center justify-between bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 mb-3">
+                      <span className="text-xs text-brand-700">已选择 {selectedResults.size} 张</span>
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          selectedResults.forEach(url => {
+                            const a = document.createElement('a'); a.href = url; a.download = `ecompic-${Date.now()}.jpg`; a.click();
+                          });
+                          setSelectedResults(new Set());
+                        }} className="text-xs bg-brand-600 text-white px-3 py-1 rounded-full">⬇️ {tr.downloadSelected}</button>
+                        <button onClick={() => selectedResults.forEach(url => deleteHistoryImage(url))} className="text-xs bg-red-500 text-white px-3 py-1 rounded-full">🗑️ 删除</button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {(viewMode==='history' ? results : favorites).map((url) => (
+                      <div key={url} className="group relative bg-slate-50 rounded-xl p-2 border border-slate-200 hover:border-brand-400 transition">
+                        <button className="block w-full" onClick={() => useHistoryImage(url)} title="点击载入这张图">
+                          <img src={url} className="w-full aspect-square object-cover rounded-lg bg-white" alt="历史生成图" />
+                        </button>
+                        <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition bg-white/95 backdrop-blur rounded-lg p-1.5 shadow flex flex-wrap gap-1 justify-center">
+                          <button onClick={() => useHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200">查看</button>
+                          <button onClick={() => remixHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-brand-600 text-white hover:bg-brand-700">编辑/再生图</button>
+                          <button onClick={() => {
+                            fetch('/api/favorites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) })
+                              .then(r => r.json()).then(d => { if (d.favorites) setFavorites(uniqueImages(d.favorites)); });
+                          }} className="text-[11px] px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">{favorites.includes(url) ? '取消收藏' : '收藏'}</button>
+                          {viewMode==='history' && <button onClick={() => deleteHistoryImage(url)} className="text-[11px] px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100">删除</button>}
                         </div>
-                        <button onClick={(e) => {
-                          e.stopPropagation();
-                          fetch('/api/favorites', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) })
-                            .then(r => r.json()).then(d => { if (d.favorites) setFavorites(d.favorites); });
-                        }} className="absolute top-1 right-1 text-sm bg-white/80 rounded-full w-6 h-6 flex items-center justify-center">{favorites.includes(url) ? '⭐' : '☆'}</button>
-                        {viewMode==='history' && selectedResults.has(i) && <div className="absolute top-1 left-1 text-xs bg-brand-500 text-white rounded-full w-5 h-5 flex items-center justify-center">✓</div>}
+                        {viewMode==='history' && (
+                          <button onClick={() => {
+                            const next = new Set(selectedResults);
+                            next.has(url) ? next.delete(url) : next.add(url);
+                            setSelectedResults(next);
+                          }} className={`absolute top-3 left-3 text-xs rounded-full w-6 h-6 flex items-center justify-center border shadow-sm ${selectedResults.has(url) ? 'bg-brand-600 text-white border-brand-600' : 'bg-white/90 text-slate-400 border-white'}`}>{selectedResults.has(url) ? '✓' : '+'}</button>
+                        )}
                       </div>
                     ))}
                   </div>

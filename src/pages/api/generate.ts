@@ -58,9 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (action === 'text2img') {
       const textPrompt = body.prompt || body.text || scene || 'product photo';
-      // 调度器：自动选择最佳模型（成本优先）
-      const result = batch 
-        ? await dispatchBatch(textPrompt)    // 并行抢答，最快者胜
+      const result = batch
+        ? await dispatchBatch(textPrompt)
         : await dispatchGeneration(textPrompt, preferredModel as any);
       url = result.url;
       meta = { provider: result.provider, model: result.model, cost: result.cost };
@@ -77,10 +76,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!url) return res.status(500).json({ error: 'AI returned no image URL' });
 
-    // 自动保存到用户历史
+    // 自动保存到用户历史：先去重再置顶，避免前端刷新或重复写入出现两张相同历史图。
     try {
-      await kv.lpush(`history:${token.email}`, url);
-      await kv.ltrim(`history:${token.email}`, 0, 19);
+      const historyKey = `history:${token.email}`;
+      await kv.lrem(historyKey, 0, url);
+      await kv.lpush(historyKey, url);
+      await kv.ltrim(historyKey, 0, 19);
     } catch {}
 
     return res.json({ url, usage: usageCheck.usage, limit: usageCheck.limit, ...meta });
