@@ -20,6 +20,23 @@ type AdminUser = {
   favoritesCountPreview?: number;
 };
 
+async function imageHash(url: string) {
+  const canonical = String(url || '').split('#')[0].split('?')[0];
+  const bytes = new TextEncoder().encode(canonical || String(url || ''));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function downloadImage(url: string, filename = 'ecompic-image.png') {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
@@ -103,6 +120,34 @@ export default function AdminPage() {
     }
   };
 
+
+  const deleteUserImage = async (user: AdminUser, kind: 'history' | 'favorites', url: string) => {
+    if (!confirm(`确定从 ${user.email} 删除这张${kind === 'history' ? '历史' : '收藏'}图片吗？`)) return;
+    const id = await imageHash(url);
+    const prev = users;
+    setUsers(list => list.map(u => u.email === user.email ? { ...u, [kind]: (u[kind] || []).filter(x => x !== url) } : u));
+    setMessage('删除中...'); setError('');
+    try {
+      const res = await fetch('/api/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, kind, id, url: url.length < 2000 ? url : '' }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '删除失败');
+      setMessage('图片已删除');
+    } catch (e: any) {
+      setUsers(prev);
+      setError(e.message || '删除失败');
+    }
+  };
+
+  const copyImageLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage('图片链接已复制');
+    } catch {
+      setError('复制失败，请手动打开图片复制链接');
+    }
+  };
+
+
   if (!loggedIn) {
     return <>
       <Head><title>EcomPic Admin</title><meta name="robots" content="noindex,nofollow" /></Head>
@@ -173,11 +218,11 @@ export default function AdminPage() {
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
                         <h4 className="text-xs font-semibold text-slate-600 mb-2">历史图片 ({u.history?.length || 0})</h4>
-                        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">{(u.history || []).map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="block rounded-lg border border-slate-200 bg-white p-1 hover:border-brand-400"><img src={url} className="aspect-square w-full object-cover rounded" alt="history" /></a>)}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.history || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="history" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">打开</button><button onClick={() => downloadImage(url, `history-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">下载</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">复制</button><button onClick={() => deleteUserImage(u, 'history', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">删除</button></div></div>)}</div>
                       </div>
                       <div>
                         <h4 className="text-xs font-semibold text-slate-600 mb-2">收藏图片 ({u.favorites?.length || 0})</h4>
-                        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">{(u.favorites || []).map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="block rounded-lg border border-slate-200 bg-white p-1 hover:border-brand-400"><img src={url} className="aspect-square w-full object-cover rounded" alt="favorite" /></a>)}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">{(u.favorites || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full object-cover rounded-lg" alt="favorite" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">打开</button><button onClick={() => downloadImage(url, `favorite-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">下载</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">复制</button><button onClick={() => deleteUserImage(u, 'favorites', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">删除</button></div></div>)}</div>
                       </div>
                     </div>
                   </td></tr>}

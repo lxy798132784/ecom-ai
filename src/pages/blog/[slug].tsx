@@ -102,7 +102,7 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
     if (!raw.includes(`slug: ${slug}`)) continue;
     const fmMatch = raw.match(/^---\n([\s\S]+?)\n---\n([\s\S]*)/); if (!fmMatch) continue;
     const meta: any = {}; fmMatch[1].split('\n').forEach(line => { const m = line.match(/^(\w+):\s*(.+)/); if (m) meta[m[1]] = m[2].trim(); });
-    const rawBody = fmMatch[2].trim(); const body = expandBlogContent(slug, rawBody); const description = meta.description || meta.excerpt || fallbackDescription(meta.title, body); const zh = getBlogZh(slug);
+    const rawBody = fmMatch[2].trim(); const body = expandBlogContent(slug, rawBody, 'en'); const description = meta.description || meta.excerpt || fallbackDescription(meta.title, body); const zh = getBlogZh(slug);
     return { props: { post: { slug, title: meta.title || slug, date: meta.date || '', category: meta.category || 'Blog', description, content: mdToHtml(body), headings: extractHeadings(body), titleZh: zh?.title || null, categoryZh: zh?.category || null, descriptionZh: zh?.description || null, contentZh: zh ? mdToHtml(zh.content) : null, headingsZh: zh ? extractHeadings(zh.content) : [] } } };
   }
   return { props: { post: null } };

@@ -399,7 +399,7 @@ AI 可以优化背景、桌面、餐具和光线，让普通菜单图更适合�
   }
 };
 
-const SEO_EXPANSIONS: Record<string, string> = {
+const SEO_EXPANSIONS_ZH: Record<string, string> = {
   'product-photos-without-studio': `
 ## 可执行拍摄清单
 
@@ -647,10 +647,85 @@ AI 可以让图片更清楚，但不能把商品变得比实物更高级。降�
 节日元素不能遮挡产品，也不能改变产品颜色和结构。`
 };
 
-export function expandBlogContent(slug: string, content: string) {
-  const extra = SEO_EXPANSIONS[slug] || (slug === 'ecommerce-product-photography-budget' ? SEO_EXPANSIONS['product-photography-budget'] : '');
-  if (!extra) return content;
-  return `${content}\n${extra}`;
+const PERSUASIVE_ZH = `
+## 为什么买家会被一张图说服
+
+买家点进商品页时，脑子里其实只有三个问题：这个东西是不是我想要的？质量看起来靠谱吗？买了以后会不会后悔？产品图片要做的不是“装饰页面”，而是在几秒钟内回答这些问题。文字描述可以慢慢解释，但第一眼建立信任的通常是图片。
+
+很多卖家以为图片只是展示产品，真正优秀的电商图片会制造一种心理画面：买家已经把产品放进自己的厨房、办公室、包里、客厅或礼物盒里。只要这个画面足够清楚，购买欲望就会被提前点燃。
+
+## 一张高转化产品图要制造的 4 个感觉
+
+1. **安全感**：图片清楚、边缘干净、颜色真实，买家不会担心收到货和页面不一样。
+2. **拥有感**：场景图让买家想象“我买了以后怎么用”。
+3. **价值感**：光线、构图和背景让产品看起来更专业、更值得这个价格。
+4. **紧迫感**：节日、活动、礼物、上新和限时场景会让用户更愿意现在下单。
+
+如果图片只能说明“这是一个产品”，它只是合格；如果图片能让用户产生“我需要它”的感觉，它才真正有转化力。
+
+## 用 AI 做图，不是为了省一张摄影费
+
+真正的价值是让卖家可以快速测试视觉方向。传统拍摄一次只能得到有限版本，而 AI 可以在同一天测试白底、浅色场景、深色高级感场景、节日场景、社媒广告构图和不同分辨率。你不需要一开始就猜哪个最好，而是用更低成本把多个方向都试出来。
+
+一个更实用的流程是：先用低积分规格生成 5-10 个方向，挑出最有购买欲的 2 个，再用高质量和目标分辨率输出最终图。这样既省钱，也更接近真实运营。
+
+## 可以直接复制的提示词
+
+**白底主图：** 保持产品主体完全不变，生成干净专业的电商白底图，柔和阴影，产品居中，适合 Amazon 和 Shopify 主图，不添加文字和多余道具。
+
+**生活场景图：** 保持产品外观、颜色和结构不变，把产品放在真实自然的使用场景中，光线柔和，背景高级但不抢主体，让买家能想象自己正在使用它。
+
+**社媒广告图：** 保持产品清晰可见，生成更有视觉冲击力的社媒广告构图，背景有氛围，突出产品价值感，适合 Instagram、Pinterest 或 TikTok 封面。
+
+## 发布前最后检查
+
+在下载和发布前，把图片放大看 30 秒：产品有没有变形？颜色是否真实？有没有多出不存在的配件？文字、Logo 或包装是否错误？如果这张图会让买家误解，那它再漂亮也不应该直接上线。
+
+好的 AI 产品图不是“骗买家”，而是更清楚、更有吸引力地展示真实商品。做到这一点，图片才会同时提升点击、转化和信任。`;
+
+const PERSUASIVE_EN = `
+## Why a product image creates desire before the copy does
+
+When a shopper lands on a product page, they are not calmly reading every word. They are asking fast, emotional questions: Is this what I need? Does it look trustworthy? Can I imagine owning it? Will I regret buying it? A strong product image answers those questions before the description has a chance to work.
+
+The goal is not simply to show the product. The goal is to help the shopper picture the product in their own kitchen, desk, wardrobe, bathroom, gift box, or daily routine. Once that mental picture forms, the product becomes easier to want.
+
+## The four feelings a high-converting product image should create
+
+1. **Trust**: clean edges, honest color, sharp details, and no confusing visual clutter.
+2. **Ownership**: lifestyle context that makes the shopper think, “I can see myself using this.”
+3. **Value**: lighting, composition, and background that make the product feel worth the price.
+4. **Urgency**: seasonal, gifting, launch, or campaign visuals that make the product feel relevant now.
+
+If an image only says “this is the item,” it is functional. If it makes the shopper think “I want this in my life,” it becomes a conversion asset.
+
+## AI is not just a cheaper photoshoot
+
+The real advantage is faster creative testing. A traditional shoot gives you a limited set of images. An AI workflow lets you test a white background, premium lifestyle scene, social ad layout, holiday version, and multiple resolutions in the same session.
+
+A practical workflow is to generate 5-10 low-cost drafts first, choose the strongest two directions, then export the winners in high quality and the right marketplace dimensions. That gives you speed without wasting budget on the wrong creative direction.
+
+## Prompt templates you can reuse
+
+**White background listing image:** Keep the product exactly the same. Create a clean professional ecommerce product image on a pure white background with soft natural shadow, centered composition, no text, no extra props, suitable for Amazon and Shopify.
+
+**Lifestyle scene:** Keep the product appearance, color, and structure unchanged. Place it in a realistic premium lifestyle setting with soft light and a background that supports the product without distracting from it.
+
+**Social ad image:** Keep the product clear and recognizable. Create a more eye-catching social media ad composition with strong visual hierarchy, premium lighting, and a background that communicates the product benefit.
+
+## Final publishing check
+
+Before publishing, zoom in for 30 seconds. Did the product shape change? Are the colors honest? Did AI invent accessories, labels, text, or packaging details? If the image could mislead a buyer, it should be fixed before going live.
+
+The best AI product images do not trick shoppers. They make the real product clearer, more desirable, and easier to trust.`;
+
+export function expandBlogContent(slug: string, content: string, lang: BlogLang = 'zh') {
+  if (lang === 'en') return `${content}
+${PERSUASIVE_EN}`;
+  const extra = SEO_EXPANSIONS_ZH[slug] || (slug === 'ecommerce-product-photography-budget' ? SEO_EXPANSIONS_ZH['product-photography-budget'] : '');
+  return `${content}
+${extra}
+${PERSUASIVE_ZH}`;
 }
 
 export function getBlogZh(slug: string) {

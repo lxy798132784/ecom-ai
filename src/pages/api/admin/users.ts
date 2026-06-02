@@ -39,6 +39,27 @@ function filterDeletedImages(items: unknown[], deleted: { urls: Set<string>; ids
   return cleanList(items).filter(url => !deleted.urls.has(url) && !deleted.ids.has(imageId(url))).slice(0, 100);
 }
 
+function imageKeys(email: string, kind: 'history' | 'favorites') {
+  return kind === 'history'
+    ? [`history:${email}`]
+    : [`fav:${email}`, `favorites:${email}`];
+}
+
+async function deleteImageEverywhere(email: string, kind: 'history' | 'favorites', url: string, id?: string) {
+  const keys = imageKeys(email, kind);
+  const targetId = id || imageId(url);
+  await Promise.all(keys.map(async key => {
+    const items = cleanList(await kv.lrange(key, 0, -1).catch(() => []));
+    const kept = items.filter(item => item !== url && imageId(item) !== targetId);
+    await kv.del(key);
+    if (kept.length) await kv.rpush(key, ...kept.slice(0, 100));
+  }));
+  const tombstoneUrlKeys = kind === 'history' ? [`deleted:history:${email}`] : [`deleted:fav:${email}`, `deleted:favorites:${email}`];
+  const tombstoneIdKeys = kind === 'history' ? [`deleted:history-id:${email}`] : [`deleted:fav-id:${email}`, `deleted:favorites-id:${email}`];
+  if (url) await Promise.all(tombstoneUrlKeys.map(key => kv.sadd(key, url)));
+  if (targetId) await Promise.all(tombstoneIdKeys.map(key => kv.sadd(key, targetId)));
+}
+
 function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7), bucket: 'free' | 'pro' = 'free') {
   return `usage:${bucket}:${email}:${month}`;
 }
@@ -122,6 +143,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await kv.set(getUsageKey(email, month, bucket), usage);
     }
 
+    return res.json({ ok: true });
+  }
+
+
+  if (req.method === 'DELETE') {
+    const body = req.body || {};
+    const email = normalizeEmail(body.email || '');
+    const kind = body.kind === 'favorites' ? 'favorites' : body.kind === 'history' ? 'history' : '';
+    const url = String(body.url || '');
+    const id = String(body.id || '');
+    if (!email || !kind || (!url && !id)) return res.status(400).json({ error: '缺少 email、kind 或图片 ID' });
+    await deleteImageEverywhere(email, kind, url, id || undefined);
     return res.json({ ok: true });
   }
 
