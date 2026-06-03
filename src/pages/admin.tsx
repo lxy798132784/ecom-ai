@@ -249,11 +249,11 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto space-y-5">
         <header className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div><h1 className="text-2xl font-bold text-slate-900">{tr.adminDashboardTitle}</h1><p className="text-sm text-slate-500">{tr.currentAdmin.replace('{email}', adminEmail)}</p></div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={toggleLang} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-3 py-2 text-sm">{lang === 'zh' ? 'EN' : '中'}</button>
-            <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm">{tr.refresh}</button>
-            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-4 py-2 text-sm">{tr.logout}</button>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <button onClick={toggleLang} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-3 py-2 text-sm whitespace-nowrap">{lang === 'zh' ? 'EN' : '中'}</button>
+            <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="min-w-0 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm whitespace-nowrap">{tr.refresh}</button>
+            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-4 py-2 text-sm whitespace-nowrap">{tr.logout}</button>
           </div>
         </header>
 
@@ -308,7 +308,36 @@ export default function AdminPage() {
           </div>
           {message && <div className="mx-4 mt-4 bg-green-50 text-green-700 text-sm rounded-xl p-3">{message}</div>}
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
-          <div className="overflow-x-auto">
+          <div className="md:hidden divide-y divide-slate-100">
+            {filtered.map(u => <div key={`mobile-${u.email}`} className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="break-all text-sm font-semibold text-slate-900">{u.email}</div>
+                  <input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} placeholder={tr.accountNameInput} className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+                </div>
+                <button onClick={() => updateUser(u, { emailVerified: u.emailVerified === false })} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${u.emailVerified === false ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>{u.emailVerified === false ? tr.unverified : tr.verified}</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="space-y-1"><span className="text-slate-500">{tr.planCol}</span><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2"><option value="free">free</option><option value="pro">pro</option></select></label>
+                <label className="space-y-1"><span className="text-slate-500">{tr.creditBalance}</span><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
+                <label className="space-y-1"><span className="text-slate-500">{tr.monthUsageCol}</span><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
+                <label className="space-y-1"><span className="text-slate-500">{tr.newPassword}</span><input type="password" value={u.newPassword || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
+              </div>
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                <div>{tr.remainingCredits}: <b>{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</b></div>
+                <div>{tr.createdAt}: <b>{u.createdAt || '-'}</b></div>
+                <div>{tr.historyCount.replace('{count}', String(u.history?.length || 0))}</div>
+                <div>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white">{tr.saveAll}</button>
+                <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button>
+                <button onClick={() => exportUserData(u)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{tr.exportData}</button>
+                <button onClick={() => deleteUserAccount(u)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white">{tr.deleteAccount}</button>
+              </div>
+            </div>)}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.verificationCol}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">{tr.remainingCredits}</th><th className="text-left p-3">{tr.creditBalance}</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
               <tbody>
