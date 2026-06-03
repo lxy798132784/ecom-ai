@@ -109,6 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const rawEmail = String(token.email);
   const email = normalizeEmail(rawEmail);
   const user = await findUserByEmail(email).catch(() => undefined);
+  if (user?.emailVerified === false) return res.status(403).json({ error: '邮箱尚未验证，请先点击邮件中的验证链接' });
   const plan = user?.plan || (token.plan as string) || 'free';
 
   let body: any;

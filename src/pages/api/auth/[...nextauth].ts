@@ -17,6 +17,7 @@ export default NextAuth({
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
+        if (user.emailVerified === false) throw new Error('EMAIL_NOT_VERIFIED');
         return { id: user.id, email: user.email, name: user.name, plan: user.plan };
       },
     }),
