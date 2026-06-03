@@ -309,22 +309,6 @@ export default function Home() {
   const removeReference = (url: string) => { const next = references.filter(x => x !== url); setReferences(next); setSelectedRefUrls(prev => prev.filter(x => x !== url)); if (activeRef === url) setActiveRef(next[0] || ''); };
   const clearReferences = () => { setReferences([]); setActiveRef(''); setSelectedRefUrls([]); };
   const applyPromptTemplate = (text: string) => { if (mode === 'text' || mode === 'agent') setPrompt(text); else setCustomPrompt(text); };
-  const currentPromptValue = mode === 'text' || mode === 'agent' ? prompt : customPrompt;
-  const setCurrentPromptValue = (value: string) => { if (mode === 'text' || mode === 'agent') setPrompt(value); else setCustomPrompt(value); };
-  const enhancePrompt = () => {
-    const base = currentPromptValue.trim();
-    if (!base) { setCurrentPromptValue(tr.promptEnhanceSeed); return; }
-    if (base.includes(tr.promptEnhanceSuffix)) return;
-    setCurrentPromptValue(`${base}, ${tr.promptEnhanceSuffix}`);
-  };
-  const draftWithAgent = () => {
-    const base = currentPromptValue.trim();
-    const seed = base || tr.agentPromptSeed;
-    setPrompt(`${seed}
-
-${tr.agentDraftSuffix}`);
-    setMode('agent');
-  };
 
   const submit = async () => {
     if (!loggedIn) { setShowLogin(true); return; }
@@ -440,24 +424,6 @@ ${tr.agentDraftSuffix}`);
             </div>
             <div className="min-w-0">
               {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={3} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" />}
-              <div className="mt-2 rounded-2xl border border-white/[0.06] bg-black/20 p-2">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button onClick={enhancePrompt} className="whitespace-nowrap rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-xs font-semibold text-brand-100 hover:bg-brand-500/25">✨ {tr.enhancePrompt}</button>
-                  <button onClick={draftWithAgent} className="whitespace-nowrap rounded-xl border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-500/20">🤖 {tr.agentDraftAction}</button>
-                </div>
-                <div className="mt-2 grid gap-2">
-                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-2">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{tr.promptTemplateGroup}</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templateCinematic}</button>
-                      <button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templatePortrait}</button>
-                      <button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templateProduct}</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 text-[11px] leading-5 text-slate-500">{tr.promptAssistHint}</div>
-                {mode === 'scene' && <div className="mt-2 flex flex-wrap gap-1.5">{SCENES.slice(0, 4).map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-full border px-2.5 py-1 text-xs ${scene === s.id ? 'border-brand-400 bg-brand-500/20 text-brand-100' : 'border-white/10 text-slate-400 hover:text-white'}`}>{s.e} {lang === 'zh' ? s.zh : s.en}</button>)}</div>}
-              </div>
               {mode === 'mask' && <div className="mt-2 rounded-xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">🎭 {tr.maskModeHint}</div>}
               {mode === 'agent' && <div className="mt-2 rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100">🤖 {tr.agentModeHint}</div>}
             </div>
