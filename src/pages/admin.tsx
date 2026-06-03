@@ -65,6 +65,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [expandedEmail, setExpandedEmail] = useState('');
   const [lang, setLangState] = useState<Lang>('zh');
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', name: '', password: '', plan: 'free', credits: 0, emailVerified: true });
   const tr = t[lang];
   const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); saveLang(next); };
@@ -257,26 +258,26 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5 md:gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.userCount}</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.length}</p>
+        <section className="grid grid-cols-2 gap-2 md:grid-cols-5 md:gap-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.userCount}</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">PRO</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.filter(u => u.plan === 'pro').length}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">PRO</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.filter(u => u.plan === 'pro').length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.verifiedAccounts}</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-emerald-600 md:mt-2 md:text-3xl">{users.filter(u => u.emailVerified !== false).length}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.verifiedAccounts}</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-emerald-600 md:mt-2 md:text-3xl">{users.filter(u => u.emailVerified !== false).length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.monthUsage}</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.monthUsage}</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.creditBalance}</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.creditBalance}</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
           </div>
         </section>
 
@@ -286,19 +287,22 @@ export default function AdminPage() {
               <h2 className="text-lg font-bold text-slate-900">{tr.createUserTitle}</h2>
               <p className="text-sm text-slate-500">{tr.createUserDesc}</p>
             </div>
-            <button disabled={loading} className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60 md:w-auto md:py-2">{tr.createUserButton}</button>
+            <button type="button" onClick={() => setShowCreateForm(v => !v)} className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 md:w-auto md:py-2">{showCreateForm ? tr.collapseImages : tr.createUserButton}</button>
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-6 md:gap-3">
-            <input required type="email" value={newUser.email} onChange={e => setNewUser(v => ({ ...v, email: e.target.value }))} placeholder={tr.accountEmail} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 md:col-span-2" />
-            <input value={newUser.name} onChange={e => setNewUser(v => ({ ...v, name: e.target.value }))} placeholder={tr.accountNameInput} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
-            <input required type="password" value={newUser.password} onChange={e => setNewUser(v => ({ ...v, password: e.target.value }))} placeholder={tr.initialPassword} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
-            <select value={newUser.plan} onChange={e => setNewUser(v => ({ ...v, plan: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"><option value="free">free</option><option value="pro">pro</option></select>
-            <input type="number" min={0} value={newUser.credits} onChange={e => setNewUser(v => ({ ...v, credits: Number(e.target.value) }))} placeholder={tr.creditBalance} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
-          </div>
-          <label className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 md:inline-flex">
-            <input type="checkbox" checked={newUser.emailVerified} onChange={e => setNewUser(v => ({ ...v, emailVerified: e.target.checked }))} className="h-4 w-4 accent-emerald-600" />
-            {tr.markVerifiedOnCreate}
-          </label>
+          {showCreateForm && <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-6 md:gap-3">
+              <input required type="email" value={newUser.email} onChange={e => setNewUser(v => ({ ...v, email: e.target.value }))} placeholder={tr.accountEmail} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 md:col-span-2" />
+              <input value={newUser.name} onChange={e => setNewUser(v => ({ ...v, name: e.target.value }))} placeholder={tr.accountNameInput} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <input required type="password" value={newUser.password} onChange={e => setNewUser(v => ({ ...v, password: e.target.value }))} placeholder={tr.initialPassword} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <select value={newUser.plan} onChange={e => setNewUser(v => ({ ...v, plan: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"><option value="free">free</option><option value="pro">pro</option></select>
+              <input type="number" min={0} value={newUser.credits} onChange={e => setNewUser(v => ({ ...v, credits: Number(e.target.value) }))} placeholder={tr.creditBalance} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+            </div>
+            <label className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 md:inline-flex">
+              <input type="checkbox" checked={newUser.emailVerified} onChange={e => setNewUser(v => ({ ...v, emailVerified: e.target.checked }))} className="h-5 w-5 shrink-0 accent-emerald-600" />
+              {tr.markVerifiedOnCreate}
+            </label>
+            <button disabled={loading} className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 md:w-auto md:py-2">{tr.createUserButton}</button>
+          </div>}
         </form>
 
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -309,13 +313,13 @@ export default function AdminPage() {
           {message && <div className="mx-4 mt-4 bg-green-50 text-green-700 text-sm rounded-xl p-3">{message}</div>}
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
           <div className="md:hidden divide-y divide-slate-100">
-            {filtered.map(u => <div key={`mobile-${u.email}`} className="p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
+            {filtered.map(u => <div key={`mobile-${u.email}`} className="p-3 space-y-3 md:p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <div className="break-all text-sm font-semibold text-slate-900">{u.email}</div>
                   <input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} placeholder={tr.accountNameInput} className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
                 </div>
-                <button onClick={() => updateUser(u, { emailVerified: u.emailVerified === false })} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${u.emailVerified === false ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>{u.emailVerified === false ? tr.unverified : tr.verified}</button>
+                <button onClick={() => updateUser(u, { emailVerified: u.emailVerified === false })} className={`min-h-10 shrink-0 rounded-xl px-3 py-2 text-xs font-semibold sm:rounded-full ${u.emailVerified === false ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>{u.emailVerified === false ? tr.unverified : tr.verified}</button>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <label className="space-y-1"><span className="text-slate-500">{tr.planCol}</span><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2"><option value="free">free</option><option value="pro">pro</option></select></label>

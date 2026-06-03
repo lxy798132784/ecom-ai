@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { t, Lang } from '../lib/i18n';
 
 type Theme = 'light' | 'dark';
@@ -17,6 +18,7 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
+  const router = useRouter();
   const [theme, setTheme] = useState<Theme>('light');
   const [lang, setLang] = useState<Lang>('zh');
 
@@ -37,6 +39,8 @@ export function ThemeToggle() {
   };
 
   const tr = t[lang];
+
+  if (router.pathname === '/admin') return null;
 
   return (
     <button
