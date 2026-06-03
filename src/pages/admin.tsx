@@ -245,57 +245,57 @@ export default function AdminPage() {
 
   return <>
     <Head><title>EcomPic Admin</title><meta name="robots" content="noindex,nofollow" /></Head>
-    <main className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-5">
-        <header className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div><h1 className="text-2xl font-bold text-slate-900">{tr.adminDashboardTitle}</h1><p className="text-sm text-slate-500">{tr.currentAdmin.replace('{email}', adminEmail)}</p></div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+    <main className="min-h-screen bg-slate-100 px-3 py-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-4 md:space-y-5">
+        <header className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="min-w-0"><h1 className="text-xl font-bold text-slate-900 md:text-2xl">{tr.adminDashboardTitle}</h1><p className="break-all text-xs text-slate-500 md:text-sm">{tr.currentAdmin.replace('{email}', adminEmail)}</p></div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap md:justify-end">
             <button onClick={toggleLang} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-3 py-2 text-sm whitespace-nowrap">{lang === 'zh' ? 'EN' : '中'}</button>
-            <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="min-w-0 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-sm whitespace-nowrap">{tr.refresh}</button>
-            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-4 py-2 text-sm whitespace-nowrap">{tr.logout}</button>
+            <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2 text-sm" />
+            <button onClick={loadUsers} className="rounded-xl bg-slate-900 text-white px-3 py-2 text-sm whitespace-nowrap">{tr.refresh}</button>
+            <button onClick={logout} className="rounded-xl bg-white border border-slate-200 text-slate-600 px-3 py-2 text-sm whitespace-nowrap">{tr.logout}</button>
           </div>
         </header>
 
-        <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.userCount}</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.length}</p>
+        <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5 md:gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.userCount}</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PRO</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.filter(u => u.plan === 'pro').length}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">PRO</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.filter(u => u.plan === 'pro').length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.verifiedAccounts}</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-emerald-600">{users.filter(u => u.emailVerified !== false).length}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.verifiedAccounts}</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-emerald-600 md:mt-2 md:text-3xl">{users.filter(u => u.emailVerified !== false).length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.monthUsage}</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.monthUsage}</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.creditBalance}</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.creditBalance}</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
           </div>
         </section>
 
-        <form onSubmit={createUser} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <form onSubmit={createUser} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+          <div className="mb-3 flex flex-col gap-3 md:mb-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{tr.createUserTitle}</h2>
               <p className="text-sm text-slate-500">{tr.createUserDesc}</p>
             </div>
-            <button disabled={loading} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">{tr.createUserButton}</button>
+            <button disabled={loading} className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60 md:w-auto md:py-2">{tr.createUserButton}</button>
           </div>
-          <div className="grid gap-3 md:grid-cols-6">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-6 md:gap-3">
             <input required type="email" value={newUser.email} onChange={e => setNewUser(v => ({ ...v, email: e.target.value }))} placeholder={tr.accountEmail} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 md:col-span-2" />
             <input value={newUser.name} onChange={e => setNewUser(v => ({ ...v, name: e.target.value }))} placeholder={tr.accountNameInput} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
             <input required type="password" value={newUser.password} onChange={e => setNewUser(v => ({ ...v, password: e.target.value }))} placeholder={tr.initialPassword} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
             <select value={newUser.plan} onChange={e => setNewUser(v => ({ ...v, plan: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"><option value="free">free</option><option value="pro">pro</option></select>
             <input type="number" min={0} value={newUser.credits} onChange={e => setNewUser(v => ({ ...v, credits: Number(e.target.value) }))} placeholder={tr.creditBalance} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
           </div>
-          <label className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          <label className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 md:inline-flex">
             <input type="checkbox" checked={newUser.emailVerified} onChange={e => setNewUser(v => ({ ...v, emailVerified: e.target.checked }))} className="h-4 w-4 accent-emerald-600" />
             {tr.markVerifiedOnCreate}
           </label>
@@ -323,18 +323,38 @@ export default function AdminPage() {
                 <label className="space-y-1"><span className="text-slate-500">{tr.monthUsageCol}</span><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
                 <label className="space-y-1"><span className="text-slate-500">{tr.newPassword}</span><input type="password" value={u.newPassword || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
               </div>
-              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
                 <div>{tr.remainingCredits}: <b>{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</b></div>
-                <div>{tr.createdAt}: <b>{u.createdAt || '-'}</b></div>
+                <div>{tr.createdAt}: <b className="break-all">{u.createdAt || '-'}</b></div>
                 <div>{tr.historyCount.replace('{count}', String(u.history?.length || 0))}</div>
                 <div>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</div>
+                <div>{tr.collectionsCount.replace('{count}', String(u.collections?.length || 0))}</div>
+                <div>{tr.mediaCount.replace('{count}', String(u.mediaHistory?.length || 0))}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white">{tr.saveAll}</button>
-                <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button>
-                <button onClick={() => exportUserData(u)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">{tr.exportData}</button>
-                <button onClick={() => deleteUserAccount(u)} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white">{tr.deleteAccount}</button>
+                <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 px-3 py-2.5 text-xs font-semibold text-white">{tr.saveAll}</button>
+                <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="rounded-lg bg-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-700">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button>
+                <button onClick={() => exportUserData(u)} className="rounded-lg bg-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-700">{tr.exportData}</button>
+                <button onClick={() => deleteUserAccount(u)} className="rounded-lg bg-red-600 px-3 py-2.5 text-xs font-semibold text-white">{tr.deleteAccount}</button>
               </div>
+              {expandedEmail === u.email && <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold text-slate-600">{tr.historyImages} ({u.history?.length || 0})</h4>
+                  <div className="grid grid-cols-2 gap-2">{(u.history || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full rounded-lg object-cover" alt="history" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `history-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'history', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
+                </div>
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold text-slate-600">{tr.favoriteImages} ({u.favorites?.length || 0})</h4>
+                  <div className="grid grid-cols-2 gap-2">{(u.favorites || []).map((url, idx) => <div key={url} className="rounded-xl border border-slate-200 bg-white p-2"><a href={url} target="_blank" rel="noreferrer"><img src={url} className="aspect-square w-full rounded-lg object-cover" alt="favorite" /></a><div className="mt-2 grid grid-cols-2 gap-1 text-[10px]"><button onClick={() => window.open(url, '_blank')} className="rounded bg-slate-100 px-1 py-1">{tr.open}</button><button onClick={() => downloadImage(url, `favorite-${idx + 1}.png`)} className="rounded bg-slate-100 px-1 py-1">{tr.download}</button><button onClick={() => copyImageLink(url)} className="rounded bg-slate-100 px-1 py-1">{tr.copy}</button><button onClick={() => deleteUserImage(u, 'favorites', url)} className="rounded bg-red-50 px-1 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
+                </div>
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold text-slate-600">{tr.collections} ({u.collections?.length || 0})</h4>
+                  <div className="space-y-2">{(u.collections || []).map(c => <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><div className="flex items-center justify-between gap-2"><div className="font-semibold text-slate-700">{c.name}</div><button onClick={() => deleteUserCollection(u, c.id)} className="rounded bg-red-50 px-2 py-1 text-red-600">{tr.delete}</button></div><div className="mt-1 text-slate-500">{c.urls?.length || 0} images</div><div className="mt-2 grid grid-cols-3 gap-1">{(c.urls || []).slice(0, 6).map(url => <div key={url} className="relative"><img src={url} className="aspect-square rounded object-cover" alt=""/><button onClick={() => deleteUserCollection(u, c.id, url)} className="absolute right-0 top-0 rounded bg-black/60 px-1 text-white">×</button></div>)}</div></div>)}</div>
+                </div>
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold text-slate-600">{tr.mediaHistory} ({u.mediaHistory?.length || 0})</h4>
+                  <div className="space-y-2">{(u.mediaHistory || []).map(m => <div key={m.id || m.url} className="rounded-xl border border-slate-200 bg-white p-3 text-xs"><div className="font-semibold text-slate-700">{m.kind}</div><div className="line-clamp-2 break-all text-slate-500">{m.prompt || m.url}</div><div className="mt-2 flex flex-wrap gap-1"><button onClick={() => window.open(m.url, '_blank')} className="rounded bg-slate-100 px-2 py-1">{tr.open}</button><button onClick={() => copyImageLink(m.url)} className="rounded bg-slate-100 px-2 py-1">{tr.copy}</button><button onClick={() => deleteUserMedia(u, m)} className="rounded bg-red-50 px-2 py-1 text-red-600">{tr.delete}</button></div></div>)}</div>
+                </div>
+              </div>}
             </div>)}
           </div>
           <div className="hidden overflow-x-auto md:block">
