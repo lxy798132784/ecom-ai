@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { kv } from '@vercel/kv';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { requireAdmin } from '../../../lib/adminAuth';
 import { normalizeEmail } from '../../../lib/users';
 import { canonicalImageId } from '../../../lib/imageStore';
@@ -13,6 +14,8 @@ interface StoredUser {
   name?: string;
   plan?: string;
   createdAt?: string;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string;
   hasPassword?: boolean;
   passwordHashPreview?: string;
 }
@@ -130,6 +133,8 @@ function sanitizeUser(user: any, fallbackEmail: string): StoredUser {
     name: user?.name || '',
     plan: user?.plan || 'free',
     createdAt: user?.createdAt || '',
+    emailVerified: user?.emailVerified !== false,
+    emailVerifiedAt: user?.emailVerifiedAt || '',
     hasPassword: Boolean(passwordHash),
     passwordHashPreview: passwordHash ? `${passwordHash.slice(0, 7)}…${passwordHash.slice(-6)}` : '',
   };
@@ -178,6 +183,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.json({ ok: true, admin: admin.email, month, users: rows });
   }
 
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const email = normalizeEmail(body.email || '');
+    const password = String(body.password || '');
+    const name = String(body.name || '').trim();
+    const plan = body.plan === 'pro' ? 'pro' : 'free';
+    const credits = Math.max(0, Number(body.credits) || 0);
+    const emailVerified = body.emailVerified !== false;
+    if (!email) return res.status(400).json({ error: '缺少用户邮箱' });
+    if (password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
+
+    const usersHash = (await kv.hgetall<Record<string, any>>('users')) || {};
+    const duplicateKey = Object.keys(usersHash).find(k => normalizeEmail(k) === email || normalizeEmail(usersHash[k]?.email || '') === email);
+    if (duplicateKey) return res.status(409).json({ error: '账号已存在' });
+
+    const now = new Date().toISOString();
+    const user = {
+      id: randomUUID(),
+      email,
+      name,
+      password: await bcrypt.hash(password, 10),
+      plan,
+      createdAt: now,
+      emailVerified,
+      emailVerifiedAt: emailVerified ? now : '',
+    };
+    await kv.hset('users', { [email]: user });
+    await kv.set(`credits:${email}`, credits);
+    return res.status(201).json({ ok: true, user: { ...sanitizeUser(user, email), credits, usage: 0, freeUsage: 0, proUsage: 0, history: [], favorites: [], collections: [], mediaHistory: [] } });
+  }
+
   if (req.method === 'PATCH') {
     const body = req.body || {};
     const email = normalizeEmail(body.email || '');
@@ -190,6 +226,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const nextUser = { ...existing, email };
     if (body.plan === 'free' || body.plan === 'pro') nextUser.plan = body.plan;
     if (typeof body.name === 'string') nextUser.name = body.name;
+    if (typeof body.emailVerified === 'boolean') {
+      nextUser.emailVerified = body.emailVerified;
+      nextUser.emailVerifiedAt = body.emailVerified ? (nextUser.emailVerifiedAt || new Date().toISOString()) : '';
+    }
     if (typeof body.newPassword === 'string' && body.newPassword.length > 0) {
       if (body.newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
       nextUser.password = await bcrypt.hash(body.newPassword, 10);

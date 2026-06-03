@@ -12,6 +12,8 @@ type AdminUser = {
   freeUsage?: number;
   proUsage?: number;
   credits: number;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string;
   hasPassword?: boolean;
   passwordHashPreview?: string;
   newPassword?: string;
@@ -63,6 +65,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [expandedEmail, setExpandedEmail] = useState('');
   const [lang, setLangState] = useState<Lang>('zh');
+  const [newUser, setNewUser] = useState({ email: '', name: '', password: '', plan: 'free', credits: 0, emailVerified: true });
   const tr = t[lang];
   const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); saveLang(next); };
 
@@ -120,7 +123,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/users?month=${encodeURIComponent(month)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, plan: next.plan, credits: next.credits, usage: next.usage, name: next.name, newPassword: next.newPassword || '' }),
+        body: JSON.stringify({ email: user.email, plan: next.plan, credits: next.credits, usage: next.usage, name: next.name, emailVerified: next.emailVerified !== false, newPassword: next.newPassword || '' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tr.failed);
@@ -129,6 +132,27 @@ export default function AdminPage() {
     } catch (e: any) {
       setError(e.message || tr.failed);
       await loadUsers();
+    }
+  };
+
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setMessage(tr.saving); setError('');
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || tr.failed);
+      setNewUser({ email: '', name: '', password: '', plan: 'free', credits: 0, emailVerified: true });
+      setMessage(tr.userCreated.replace('{email}', data.user?.email || newUser.email));
+      await loadUsers();
+    } catch (err: any) {
+      setError(err.message || tr.failed);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -233,24 +257,49 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.userCount}</p>
             <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PRO</p>
             <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.filter(u => u.plan === 'pro').length}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.verifiedAccounts}</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-emerald-600">{users.filter(u => u.emailVerified !== false).length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.monthUsage}</p>
             <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.creditBalance}</p>
             <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
           </div>
         </section>
+
+        <form onSubmit={createUser} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">{tr.createUserTitle}</h2>
+              <p className="text-sm text-slate-500">{tr.createUserDesc}</p>
+            </div>
+            <button disabled={loading} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">{tr.createUserButton}</button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-6">
+            <input required type="email" value={newUser.email} onChange={e => setNewUser(v => ({ ...v, email: e.target.value }))} placeholder={tr.accountEmail} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 md:col-span-2" />
+            <input value={newUser.name} onChange={e => setNewUser(v => ({ ...v, name: e.target.value }))} placeholder={tr.accountNameInput} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+            <input required type="password" value={newUser.password} onChange={e => setNewUser(v => ({ ...v, password: e.target.value }))} placeholder={tr.initialPassword} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+            <select value={newUser.plan} onChange={e => setNewUser(v => ({ ...v, plan: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"><option value="free">free</option><option value="pro">pro</option></select>
+            <input type="number" min={0} value={newUser.credits} onChange={e => setNewUser(v => ({ ...v, credits: Number(e.target.value) }))} placeholder={tr.creditBalance} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+          </div>
+          <label className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+            <input type="checkbox" checked={newUser.emailVerified} onChange={e => setNewUser(v => ({ ...v, emailVerified: e.target.checked }))} className="h-4 w-4 accent-emerald-600" />
+            {tr.markVerifiedOnCreate}
+          </label>
+        </form>
 
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -261,11 +310,15 @@ export default function AdminPage() {
           {error && <div className="mx-4 mt-4 bg-red-50 text-red-600 text-sm rounded-xl p-3">{error}</div>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">{tr.remainingCredits}</th><th className="text-left p-3">{tr.creditBalance}</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.verificationCol}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">{tr.remainingCredits}</th><th className="text-left p-3">{tr.creditBalance}</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
               <tbody>
                 {filtered.map(u => <Fragment key={u.email}>
                   <tr className="border-t border-slate-100">
                     <td className="p-3"><div className="font-medium text-slate-800">{u.email}</div><input value={u.name || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, name: e.target.value } : x))} className="mt-1 w-40 rounded-lg border border-slate-200 px-2 py-1 text-xs" /></td>
+                    <td className="p-3">
+                      <button onClick={() => updateUser(u, { emailVerified: u.emailVerified === false })} className={`inline-flex min-w-24 items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${u.emailVerified === false ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'}`}>{u.emailVerified === false ? tr.unverified : tr.verified}</button>
+                      <div className="mt-1 text-[10px] text-slate-400">{u.emailVerified === false ? tr.setVerified : tr.setUnverified}</div>
+                    </td>
                     <td className="p-3">
                       <div className="text-[11px] text-slate-400 mb-1">{tr.passwordNoView}</div>
                       <input type="password" value={u.newPassword || ''} placeholder={tr.newPassword} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs" />
@@ -283,7 +336,7 @@ export default function AdminPage() {
                       <button onClick={() => deleteUserAccount(u)} className="block rounded-lg bg-red-600 text-white px-3 py-1.5 text-xs hover:bg-red-700">{tr.deleteAccount}</button>
                     </td>
                   </tr>
-                  {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={9} className="p-4">
+                  {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={10} className="p-4">
                     <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
                       <div>
                         <h4 className="text-xs font-semibold text-slate-600 mb-2">{tr.historyImages} ({u.history?.length || 0})</h4>
