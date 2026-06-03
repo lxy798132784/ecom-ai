@@ -129,23 +129,53 @@ function Modal({ show, title, onClose, children, wide = false }: { show: boolean
 
 function TurnstileBox({ token, setToken, tr }: { token: string; setToken: (value: string) => void; tr: any }) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const callbackName = useRef(`turnstileCallback_${Math.random().toString(36).slice(2)}`).current;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!siteKey || typeof window === 'undefined') return;
-    (window as any)[callbackName] = (nextToken: string) => setToken(nextToken);
-    if (!document.querySelector('script[data-turnstile-script="true"]')) {
+    let disposed = false;
+    setToken('');
+
+    const renderWidget = () => {
+      const turnstile = (window as any).turnstile;
+      if (disposed || !containerRef.current || !turnstile?.render || widgetIdRef.current) return;
+      widgetIdRef.current = turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: (nextToken: string) => setToken(nextToken || ''),
+        'expired-callback': () => setToken(''),
+        'error-callback': () => setToken(''),
+      });
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-turnstile-script="true"]');
+    if (existingScript) {
+      renderWidget();
+      existingScript.addEventListener('load', renderWidget, { once: true });
+    } else {
       const script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
       script.dataset.turnstileScript = 'true';
+      script.addEventListener('load', renderWidget, { once: true });
       document.head.appendChild(script);
     }
-    return () => { delete (window as any)[callbackName]; };
-  }, [callbackName, setToken, siteKey]);
+
+    const retry = window.setTimeout(renderWidget, 250);
+    return () => {
+      disposed = true;
+      window.clearTimeout(retry);
+      const turnstile = (window as any).turnstile;
+      if (widgetIdRef.current && turnstile?.remove) turnstile.remove(widgetIdRef.current);
+      widgetIdRef.current = null;
+      setToken('');
+    };
+  }, [setToken, siteKey]);
+
   if (!siteKey) return <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{tr.captchaLocalBypass}</div>;
   return <div className="mb-4 rounded-2xl border border-white/10 bg-[#08090a] p-3">
-    <div className="cf-turnstile" data-sitekey={siteKey} data-callback={callbackName} />
+    <div ref={containerRef} className="min-h-[65px]" />
     <div className="mt-2 text-xs text-slate-400">{token ? tr.captchaVerified : tr.captchaRequired}</div>
   </div>;
 }
@@ -370,7 +400,7 @@ ${tr.agentDraftSuffix}`);
           </nav>
           <div className="flex items-center gap-2 text-xs">
             <button onClick={toggleLang} className="rounded-lg border border-white/10 px-2 py-1">{lang === 'zh' ? 'EN' : '中'}</button>
-            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {usageLeft}+{credits}</span><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => setShowRegister(true)} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
+            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {usageLeft}+{credits}</span><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => { setShowRegister(true); setCaptchaToken(''); }} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
           </div>
         </div>
       </header>
@@ -543,8 +573,8 @@ ${tr.agentDraftSuffix}`);
       </Modal>
       <Modal show={Boolean(detailItem)} title={tr.imageDetails} onClose={() => setDetailItem(null)}>{detailItem && <div className="space-y-3 text-sm"><img src={detailItem.url} className="max-h-64 w-full rounded-xl object-contain bg-slate-100" alt="" /><div className="grid grid-cols-2 gap-2 text-xs"><div><b>{tr.customPrompt}</b><p className="break-words text-slate-500">{detailItem.prompt || '-'}</p></div><div><b>{tr.actions}</b><p className="text-slate-500">{detailItem.action || '-'}</p></div><div><b>{tr.resolution}</b><p className="text-slate-500">{detailItem.size || '-'}</p></div><div><b>{tr.outputFormat}</b><p className="text-slate-500">{detailItem.outputFormat || '-'}</p></div><div><b>{tr.referencePanel}</b><p className="text-slate-500">{detailItem.referenceCount || 0}</p></div><div><b>{tr.createdAt}</b><p className="text-slate-500">{detailItem.createdAt || '-'}</p></div></div><button onClick={() => navigator.clipboard?.writeText(detailItem.prompt || detailItem.url)} className="w-full rounded-xl bg-brand-600 py-2 text-white">{tr.copy}</button></div>}</Modal>
       <Modal show={showLogin} title={'🔐 ' + tr.loginTitle} onClose={() => setShowLogin(false)}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}{verificationEmail && <button onClick={resendVerification} className="mt-2 block text-xs font-semibold text-red-700 underline">{tr.resendVerification}</button>}</div>}<input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.password} type="password" onKeyDown={e => e.key === 'Enter' && doLogin()} className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><button onClick={doLogin} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.login}</button><button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); setCaptchaToken(''); }} className="mt-2 w-full text-center text-xs text-slate-400 hover:text-brand-600">{tr.forgotPassword}</button><p className="mt-3 text-center text-sm text-slate-400">{tr.noAccount} <button onClick={() => { setShowLogin(false); setShowRegister(true); setAuthError(''); setCaptchaToken(''); }} className="text-brand-600">{tr.register}</button></p></Modal>
-      <Modal show={showRegister} title={'✨ ' + tr.registerTitle} onClose={() => setShowRegister(false)}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<input value={authName} onChange={e => setAuthName(e.target.value)} placeholder={tr.name} className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.passwordHint} type="password" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button></Modal>
-      <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => setShowForgot(false)}>{forgotSent ? <div className="text-center"><p className="mb-4 text-5xl">📧</p><p className="mb-2 font-medium text-slate-700">{tr.emailSent}</p><p className="mb-4 text-sm text-slate-500">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p><button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.backToLogin}</button></div> : <>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<p className="mb-4 text-sm text-slate-500">{tr.forgotDesc}</p><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doForgot} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.sendResetLink}</button></>}</Modal>
+      <Modal show={showRegister} title={'✨ ' + tr.registerTitle} onClose={() => { setShowRegister(false); setCaptchaToken(''); }}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<input value={authName} onChange={e => setAuthName(e.target.value)} placeholder={tr.name} className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.passwordHint} type="password" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button></Modal>
+      <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => { setShowForgot(false); setCaptchaToken(''); }}>{forgotSent ? <div className="text-center"><p className="mb-4 text-5xl">📧</p><p className="mb-2 font-medium text-slate-700">{tr.emailSent}</p><p className="mb-4 text-sm text-slate-500">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p><button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.backToLogin}</button></div> : <>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<p className="mb-4 text-sm text-slate-500">{tr.forgotDesc}</p><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doForgot} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.sendResetLink}</button></>}</Modal>
       <Modal show={showPay} title={'🚀 ' + tr.upgradeTitle} onClose={() => setShowPay(false)}><p className="mb-4 text-center text-sm text-slate-500">{usageLeft <= 0 ? tr.limitReached : tr.freeLeftDesc.replace('{left}', String(usageLeft))}</p><a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener" className="block w-full rounded-xl bg-brand-600 py-2.5 text-center font-semibold text-white">💳 {tr.upgradeBtn}</a><button onClick={() => setShowPay(false)} className="mt-2 w-full text-sm text-slate-400">{tr.later}</button></Modal>
     </main>
   </>;

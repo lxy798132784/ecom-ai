@@ -165,6 +165,29 @@ export default function AdminPage() {
     a.href = url; a.download = `user-${user.email}.json`; a.click(); URL.revokeObjectURL(url);
   };
 
+  const deleteUserAccount = async (user: AdminUser) => {
+    if (!confirm(tr.confirmDeleteUserAccount.replace('{email}', user.email))) return;
+    const typed = window.prompt(tr.confirmDeleteUserAccountPrompt.replace('{email}', user.email));
+    if (typed !== user.email) { setError(tr.deleteUserAccountMismatch); return; }
+    const prev = users;
+    setUsers(list => list.filter(u => u.email !== user.email));
+    setMessage(tr.deleting); setError('');
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, kind: 'account', confirm: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || tr.deleteUserAccountFailed);
+      if (expandedEmail === user.email) setExpandedEmail('');
+      setMessage(tr.userAccountDeleted.replace('{email}', user.email));
+    } catch (e: any) {
+      setUsers(prev);
+      setError(e.message || tr.deleteUserAccountFailed);
+    }
+  };
+
   const deleteUserMedia = async (user: AdminUser, item: { id?: string; url: string }) => {
     if (!confirm(tr.confirmDeleteUserMedia.replace('{email}', user.email))) return;
     const prev = users; setUsers(list => list.map(u => u.email === user.email ? { ...u, mediaHistory: (u.mediaHistory || []).filter(x => x.id !== item.id && x.url !== item.url) } : u));
@@ -245,6 +268,7 @@ export default function AdminPage() {
                     <td className="p-3 space-y-2">
                       <button onClick={() => updateUser(u, {})} className="rounded-lg bg-brand-600 text-white px-3 py-1.5 text-xs hover:bg-brand-700">{tr.saveAll}</button>
                       <button onClick={() => setExpandedEmail(expandedEmail === u.email ? '' : u.email)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{expandedEmail === u.email ? tr.collapseImages : tr.viewImages}</button><button onClick={() => exportUserData(u)} className="block rounded-lg bg-slate-100 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-200">{tr.exportData}</button>
+                      <button onClick={() => deleteUserAccount(u)} className="block rounded-lg bg-red-600 text-white px-3 py-1.5 text-xs hover:bg-red-700">{tr.deleteAccount}</button>
                     </td>
                   </tr>
                   {expandedEmail === u.email && <tr className="bg-slate-50"><td colSpan={9} className="p-4">

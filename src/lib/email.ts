@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import crypto from 'crypto';
 import { kv } from '@vercel/kv';
+import nodemailer from 'nodemailer';
 
 const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Image Studio AI';
@@ -9,16 +10,48 @@ export function createToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-export async function sendMail(options: { to: string; subject: string; html: string }) {
-  if (!process.env.RESEND_API_KEY) return { skipped: true };
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({
-    from: process.env.EMAIL_FROM || `${appName} <noreply@example.com>`,
+function mailFrom() {
+  return process.env.EMAIL_FROM || process.env.SMTP_FROM || `${appName} <noreply@example.com>`;
+}
+
+async function sendSmtpMail(options: { to: string; subject: string; html: string }) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return false;
+
+  const port = Number(process.env.SMTP_PORT || 465);
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+  await transporter.sendMail({
+    from: mailFrom(),
     to: options.to,
     subject: options.subject,
     html: options.html,
   });
-  return { skipped: false };
+  return true;
+}
+
+async function sendResendMail(options: { to: string; subject: string; html: string }) {
+  if (!process.env.RESEND_API_KEY) return false;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: mailFrom(),
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+  });
+  return true;
+}
+
+export async function sendMail(options: { to: string; subject: string; html: string }) {
+  if (await sendSmtpMail(options)) return { provider: 'smtp', skipped: false };
+  if (await sendResendMail(options)) return { provider: 'resend', skipped: false };
+  return { provider: 'none', skipped: true };
 }
 
 export async function createEmailVerification(email: string) {

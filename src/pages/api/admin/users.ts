@@ -79,6 +79,44 @@ async function deleteImageEverywhere(email: string, kind: 'history' | 'favorites
   if (url) await Promise.all(tombstoneUrlKeys.map(key => kv.sadd(key, url)));
   if (targetId) await Promise.all(tombstoneIdKeys.map(key => kv.sadd(key, targetId)));
 }
+async function deleteAccountEverywhere(email: string, rawEmail = '') {
+  const usersHash = (await kv.hgetall<Record<string, any>>('users')) || {};
+  const aliases = userAliasKeys(usersHash, email, rawEmail);
+  const months = new Set<string>([new Date().toISOString().slice(0, 7)]);
+  const usageKeys = await kv.keys('usage:*').catch(() => [] as string[]);
+  usageKeys.forEach(key => {
+    if (aliases.some(alias => String(key).includes(`:${alias}:`))) months.add(String(key).slice(-7));
+  });
+
+  const ownedKeys = await listKeysByOwner(
+    ['history', 'fav', 'favorites', 'collections', 'media:history', 'deleted:history', 'deleted:fav', 'deleted:favorites', 'deleted:history-id', 'deleted:fav-id', 'deleted:favorites-id'],
+    email,
+    aliases.flatMap(alias => [
+      `history:${alias}`,
+      `fav:${alias}`,
+      `favorites:${alias}`,
+      `collections:${alias}`,
+      `media:history:${alias}`,
+      `deleted:history:${alias}`,
+      `deleted:fav:${alias}`,
+      `deleted:favorites:${alias}`,
+      `deleted:history-id:${alias}`,
+      `deleted:fav-id:${alias}`,
+      `deleted:favorites-id:${alias}`,
+    ]),
+  );
+
+  const billingKeys = aliases.flatMap(alias => [
+    `credits:${alias}`,
+    ...Array.from(months).flatMap(m => [`usage:free:${alias}:${m}`, `usage:pro:${alias}:${m}`]),
+  ]);
+
+  await Promise.all([
+    ...aliases.map(alias => kv.hdel('users', alias).catch(() => undefined)),
+    ...Array.from(new Set([...ownedKeys, ...billingKeys])).map(key => kv.del(key).catch(() => undefined)),
+  ]);
+}
+
 
 function getUsageKey(email: string, month = new Date().toISOString().slice(0, 7), bucket: 'free' | 'pro' = 'free') {
   return `usage:${bucket}:${email}:${month}`;
@@ -175,10 +213,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'DELETE') {
     const body = req.body || {};
     const email = normalizeEmail(body.email || '');
-    const kind = body.kind === 'favorites' ? 'favorites' : body.kind === 'history' ? 'history' : body.kind === 'media' ? 'media' : body.kind === 'collection' ? 'collection' : '';
+    const kind = body.kind === 'account' ? 'account' : body.kind === 'favorites' ? 'favorites' : body.kind === 'history' ? 'history' : body.kind === 'media' ? 'media' : body.kind === 'collection' ? 'collection' : '';
     const url = String(body.url || '');
     const id = String(body.id || '');
     if (!email || !kind) return res.status(400).json({ error: '缺少 email 或 kind' });
+    if (kind === 'account') {
+      if (!body.confirm) return res.status(400).json({ error: '删除账号需要二次确认' });
+      await deleteAccountEverywhere(email, body.email || '');
+      return res.json({ ok: true });
+    }
     if (kind === 'media') {
       if (!id && !url) return res.status(400).json({ error: '缺少媒体 ID' });
       await removeMediaHistory(email, id || url);
