@@ -249,12 +249,24 @@ export default function Home() {
   const applyPromptTemplate = (text: string) => { if (mode === 'text' || mode === 'agent') setPrompt(text); else setCustomPrompt(text); };
   const currentPromptValue = mode === 'text' || mode === 'agent' ? prompt : customPrompt;
   const setCurrentPromptValue = (value: string) => { if (mode === 'text' || mode === 'agent') setPrompt(value); else setCustomPrompt(value); };
-  const appendPromptStyle = (text: string) => setCurrentPromptValue([currentPromptValue.trim(), text].filter(Boolean).join(', '));
+  const appendPromptStyle = (text: string) => {
+    const base = currentPromptValue.trim();
+    if (base.toLowerCase().includes(text.toLowerCase())) return;
+    setCurrentPromptValue([base, text].filter(Boolean).join(', '));
+  };
   const enhancePrompt = () => {
     const base = currentPromptValue.trim();
     if (!base) { setCurrentPromptValue(tr.promptEnhanceSeed); return; }
     if (base.includes(tr.promptEnhanceSuffix)) return;
     setCurrentPromptValue(`${base}, ${tr.promptEnhanceSuffix}`);
+  };
+  const draftWithAgent = () => {
+    const base = currentPromptValue.trim();
+    const seed = base || tr.agentPromptSeed;
+    setPrompt(`${seed}
+
+${tr.agentDraftSuffix}`);
+    setMode('agent');
   };
 
   const submit = async () => {
@@ -264,7 +276,7 @@ export default function Home() {
     if ((mode === 'text' || mode === 'edit' || mode === 'mask' || mode === 'agent') && !basePrompt) { setError(tr.pleaseFill); return; }
     if (usageLeft < pointsCost && credits < pointsCost) { accountPlan === 'pro' ? setError(tr.proMonthlyNotEnough) : setShowPay(true); return; }
     const action = mode === 'text' || mode === 'agent' ? 'text2img' : mode === 'background' ? 'whitebg' : mode === 'scene' ? 'scene' : 'custom';
-    const effectivePrompt = mode === 'mask' ? `${basePrompt}. Apply as localized inpainting-style edit while preserving unmentioned areas.` : mode === 'agent' ? `${basePrompt}. Think like an image creation assistant and produce the best final image.` : basePrompt;
+    const effectivePrompt = mode === 'mask' ? `${basePrompt}. Apply as localized inpainting-style edit while preserving unmentioned areas.` : mode === 'agent' ? `${basePrompt}. Use this as a polished final image prompt; prioritize clear subject, coherent composition, lighting, style consistency, and production-ready details.` : basePrompt;
     const id = newId();
     setTasks(p => [{ id, prompt: effectivePrompt || scene, action: mode, status: 'running' as const, inputUrl: primaryReference, createdAt: Date.now() }, ...p].slice(0, 50));
     setLoading(true); setError(''); setResult(null);
@@ -364,21 +376,37 @@ export default function Home() {
 
       <div className="mx-auto max-w-7xl px-4 py-5">
         <section id="create" className="rounded-[28px] border border-white/[0.08] bg-[#0f1011]/95 p-3 shadow-2xl shadow-black/30 backdrop-blur md:p-4">
-          <div className="grid gap-3 xl:grid-cols-[220px_minmax(0,1fr)_200px] xl:items-stretch">
-            <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.06] bg-black/25 p-1.5 sm:grid-cols-3 xl:grid-cols-2">
+          <div className="grid gap-3 xl:grid-cols-[220px_minmax(0,1fr)_200px] xl:items-start">
+            <div className="grid self-start grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.06] bg-black/25 p-1.5 sm:grid-cols-3 xl:grid-cols-2">
               {(['text','edit','background','scene','mask','agent'] as StudioMode[]).map(m => <button key={m} onClick={() => setMode(m)} className={`rounded-xl px-2.5 py-2 text-xs font-medium transition ${mode === m ? 'bg-brand-600 text-white shadow-[0_0_0_1px_rgba(255,255,255,.12)_inset]' : 'text-slate-400 hover:bg-white/[0.07] hover:text-slate-100'}`}><span className="mr-1">{modeIcon(m)}</span>{tr[`mode_${m}`]}</button>)}
             </div>
             <div className="min-w-0">
               {(mode === 'text' || mode === 'agent') ? <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder={mode === 'agent' ? tr.agentPromptPlaceholder : tr.promptPlaceholderGeneric} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" /> : <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} rows={3} placeholder={mode === 'background' ? tr.backgroundPromptPlaceholder : mode === 'mask' ? tr.maskPromptPlaceholder : tr.editPromptPlaceholder} className="h-full min-h-[106px] w-full resize-none rounded-2xl border border-white/[0.08] bg-[#08090a] p-3 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-400/70" />}
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <button onClick={enhancePrompt} className="rounded-full border border-brand-400/40 bg-brand-500/10 px-2.5 py-1 font-semibold text-brand-100 hover:bg-brand-500/20">✨ {tr.enhancePrompt}</button>
-                <button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateCinematic}</button>
-                <button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templatePortrait}</button>
-                <button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-300 hover:bg-white/[0.06]">{tr.templateProduct}</button>
-                <button onClick={() => appendPromptStyle(tr.stylePhotorealPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.stylePhotoreal}</button>
-                <button onClick={() => appendPromptStyle(tr.styleDesignPosterPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleDesignPoster}</button>
-                <button onClick={() => appendPromptStyle(tr.styleMinimalPrompt)} className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleMinimal}</button>
-                {mode === 'scene' && SCENES.slice(0, 4).map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-full border px-2.5 py-1 ${scene === s.id ? 'border-brand-400 bg-brand-500/20 text-brand-100' : 'border-white/10 text-slate-400 hover:text-white'}`}>{s.e} {lang === 'zh' ? s.zh : s.en}</button>)}
+              <div className="mt-2 rounded-2xl border border-white/[0.06] bg-black/20 p-2">
+                <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
+                  <button onClick={enhancePrompt} className="rounded-xl border border-brand-400/40 bg-brand-500/15 px-3 py-2 text-xs font-semibold text-brand-100 hover:bg-brand-500/25">✨ {tr.enhancePrompt}</button>
+                  <button onClick={draftWithAgent} className="rounded-xl border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-500/20">🤖 {tr.agentDraftAction}</button>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{tr.promptTemplateGroup}</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button onClick={() => applyPromptTemplate(tr.templateCinematicPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templateCinematic}</button>
+                      <button onClick={() => applyPromptTemplate(tr.templatePortraitPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templatePortrait}</button>
+                      <button onClick={() => applyPromptTemplate(tr.templateProductPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]">{tr.templateProduct}</button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-2">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{tr.promptStyleGroup}</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button onClick={() => appendPromptStyle(tr.stylePhotorealPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.stylePhotoreal}</button>
+                      <button onClick={() => appendPromptStyle(tr.styleDesignPosterPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleDesignPoster}</button>
+                      <button onClick={() => appendPromptStyle(tr.styleMinimalPrompt)} className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-400 hover:bg-white/[0.06] hover:text-white">{tr.styleMinimal}</button>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] leading-5 text-slate-500">{tr.promptAssistHint}</div>
+                {mode === 'scene' && <div className="mt-2 flex flex-wrap gap-1.5">{SCENES.slice(0, 4).map(s => <button key={s.id} onClick={() => setScene(s.id)} className={`rounded-full border px-2.5 py-1 text-xs ${scene === s.id ? 'border-brand-400 bg-brand-500/20 text-brand-100' : 'border-white/10 text-slate-400 hover:text-white'}`}>{s.e} {lang === 'zh' ? s.zh : s.en}</button>)}</div>}
               </div>
               {mode === 'mask' && <div className="mt-2 rounded-xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">🎭 {tr.maskModeHint}</div>}
               {mode === 'agent' && <div className="mt-2 rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100">🤖 {tr.agentModeHint}</div>}
@@ -434,7 +462,7 @@ export default function Home() {
           <div className="min-h-[520px] rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
             {loading && <div className="flex min-h-[480px] flex-col items-center justify-center text-center"><div className="mb-3 animate-bounce text-5xl">🎨</div><div>{tr.generating}</div><div className="mt-1 text-xs text-slate-500">{tr.waitSeconds}</div></div>}
             {!loading && result && <div><div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-bold">✅ {tr.done}</h2><div className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap"><button onClick={() => addReferenceFromGallery(result)} className="rounded-xl bg-white/10 px-3 py-2 hover:bg-white/15">{tr.useAsReference}</button><button onClick={() => toggleFavorite(result)} className="rounded-xl bg-yellow-500/10 px-3 py-2 text-yellow-200">{favoriteUrls.includes(result) ? tr.unfavorite : tr.favorite}</button><button onClick={() => downloadAs(result, outputFormat, 'image-studio-result')} className="rounded-xl bg-slate-100 px-3 py-2 text-slate-900">⬇️ {tr.download}</button><button onClick={() => setResult(null)} className="text-slate-400 hover:text-white">{tr.clear}</button></div></div><img src={result} className="max-h-[760px] w-full rounded-2xl bg-[#08090a] object-contain" alt="" /></div>}
-            {!loading && !result && <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center text-slate-500"><div className="mb-4 text-7xl">🧠</div><div className="font-medium text-slate-300">{tr.emptyStudioTitle}</div><div className="mt-2 max-w-md text-sm leading-6">{tr.emptyStudioDesc}</div><div className="mt-6 grid w-full max-w-2xl gap-2 text-left text-xs sm:grid-cols-3"><button onClick={() => { setMode('text'); applyPromptTemplate(tr.templateCinematicPrompt); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">✨</div><div className="mt-2 font-semibold text-slate-200">{tr.quickTextStart}</div><p className="mt-1 text-slate-500">{tr.quickTextStartDesc}</p></button><button onClick={() => { setMode('edit'); document.getElementById('references')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🖼️</div><div className="mt-2 font-semibold text-slate-200">{tr.quickRefStart}</div><p className="mt-1 text-slate-500">{tr.quickRefStartDesc}</p></button><button onClick={() => { setMode('agent'); setPrompt(tr.agentPromptSeed); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🤖</div><div className="mt-2 font-semibold text-slate-200">{tr.quickAgentStart}</div><p className="mt-1 text-slate-500">{tr.quickAgentStartDesc}</p></button></div></div>}
+            {!loading && !result && <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center text-slate-500"><div className="mb-4 text-7xl">🧠</div><div className="font-medium text-slate-300">{tr.emptyStudioTitle}</div><div className="mt-2 max-w-md text-sm leading-6">{tr.emptyStudioDesc}</div><div className="mt-6 grid w-full max-w-2xl gap-2 text-left text-xs sm:grid-cols-3"><button onClick={() => { setMode('text'); applyPromptTemplate(tr.templateCinematicPrompt); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">✨</div><div className="mt-2 font-semibold text-slate-200">{tr.quickTextStart}</div><p className="mt-1 text-slate-500">{tr.quickTextStartDesc}</p></button><button onClick={() => { setMode('edit'); document.getElementById('references')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🖼️</div><div className="mt-2 font-semibold text-slate-200">{tr.quickRefStart}</div><p className="mt-1 text-slate-500">{tr.quickRefStartDesc}</p></button><button onClick={() => { setMode('agent'); setPrompt(`${tr.agentPromptSeed}\n\n${tr.agentDraftSuffix}`); }} className="rounded-2xl border border-white/10 bg-[#08090a] p-4 hover:border-brand-400/50"><div className="text-lg">🤖</div><div className="mt-2 font-semibold text-slate-200">{tr.quickAgentStart}</div><p className="mt-1 text-slate-500">{tr.quickAgentStartDesc}</p></button></div></div>}
           </div>
 
           <div id="gallery" className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-4">
