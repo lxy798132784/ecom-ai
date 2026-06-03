@@ -50,7 +50,7 @@ export function MediaUpload({ label, description, accept, value, onChange, previ
         <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
       </div>
       <div {...getRootProps()} className={`cursor-pointer rounded-2xl border-2 border-dashed p-5 transition ${isDragActive ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-slate-50 hover:border-brand-400'}`}>
-        <input {...getInputProps()} />
+        <input {...getInputProps({ className: 'hidden' })} aria-label={label} />
         <div className="flex min-h-[104px] items-center justify-center text-center">
           <div>
             <div className="mb-2 text-3xl">{preview === 'audio' ? '🎧' : '🖼️'}</div>

@@ -124,6 +124,49 @@ img.rounded-xl, video.rounded-xl, img.rounded-2xl, video.rounded-2xl { backgroun
 
 /* Studio pages own their dark chrome. Keep them stable regardless of global light/dark toggle. */
 .studio-shell { background: #08090a !important; color: #f8fafc !important; overflow-x: hidden; }
+html.theme-light .studio-shell {
+  background: #f6f7fb !important;
+  color: #111827 !important;
+}
+html.theme-light .studio-shell main, html.theme-light .studio-shell section { color: #111827 !important; }
+html.theme-light .studio-shell header { background: rgba(255,255,255,.94) !important; border-color: rgba(15,23,42,.10) !important; }
+html.theme-light .studio-shell [class*="bg-[#08090a]"], html.theme-light .studio-shell [class*="bg-[#0f1011]"] { background: #ffffff !important; }
+html.theme-light .studio-shell [class*="bg-white/"] { background: rgba(255,255,255,.88) !important; }
+html.theme-light .studio-shell [class*="border-white/"] { border-color: rgba(15,23,42,.12) !important; }
+html.theme-light .studio-shell .text-slate-50, html.theme-light .studio-shell .text-slate-100, html.theme-light .studio-shell .text-slate-200, html.theme-light .studio-shell .text-slate-300 { color: #111827 !important; }
+html.theme-light .studio-shell .text-slate-400, html.theme-light .studio-shell .text-slate-500 { color: #64748b !important; }
+html.theme-light .studio-shell input, html.theme-light .studio-shell textarea, html.theme-light .studio-shell select { background: #ffffff !important; color: #111827 !important; border-color: rgba(15,23,42,.14) !important; }
+html.theme-light .studio-shell option { background: #ffffff; color: #111827; }
+html.theme-light .studio-shell img.rounded-xl, html.theme-light .studio-shell img.rounded-2xl { background: #f1f5f9 !important; }
+html.theme-light .studio-shell .shadow-sm, html.theme-light .studio-shell .shadow, html.theme-light .studio-shell .shadow-md, html.theme-light .studio-shell .shadow-lg, html.theme-light .studio-shell .shadow-xl, html.theme-light .studio-shell .shadow-2xl { box-shadow: 0 0 0 1px rgba(15,23,42,.08), 0 18px 50px rgba(15,23,42,.10) !important; }
+html.theme-light .studio-shell .bg-slate-100, html.theme-light .studio-shell .bg-slate-50 { background-color: #f8fafc !important; }
+.studio-modal-panel {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+html.theme-light .studio-modal-panel {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: rgba(15,23,42,.12) !important;
+}
+.size-picker-modal .size-current-card, .size-picker-modal .size-mode-tabs, .size-picker-modal .size-auto-card, .size-picker-modal .size-choice {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255,255,255,.14) !important;
+}
+html.theme-light .size-picker-modal .size-current-card, html.theme-light .size-picker-modal .size-mode-tabs, html.theme-light .size-picker-modal .size-auto-card, html.theme-light .size-picker-modal .size-choice {
+  background: #f8fafc !important;
+  color: #111827 !important;
+  border-color: rgba(15,23,42,.12) !important;
+}
+.size-picker-modal .is-active {
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+html.theme-light .size-picker-modal input { background: #ffffff !important; color: #111827 !important; }
+html.theme-dark .size-picker-modal input, .studio-shell .size-picker-modal input { background: #020617 !important; color: #f8fafc !important; }
 .studio-shell input, .studio-shell textarea, .studio-shell select {
   background: #08090a !important;
   color: #f8fafc !important;
@@ -137,6 +180,21 @@ img.rounded-xl, video.rounded-xl, img.rounded-2xl, video.rounded-2xl { backgroun
 .studio-shell .text-slate-400 { color: #cbd5e1 !important; }
 .studio-shell .shadow-sm, .studio-shell .shadow, .studio-shell .shadow-md, .studio-shell .shadow-lg, .studio-shell .shadow-xl, .studio-shell .shadow-2xl { box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 20px 70px rgba(0,0,0,.35) !important; }
 .studio-shell [class*="bg-white/"] { border-color: rgba(255,255,255,.10) !important; }
+
+/* Explicit light theme must be declared after the studio dark defaults so the toggle has a visible effect. */
+html.theme-light .studio-shell { background: #f6f7fb !important; color: #111827 !important; }
+html.theme-light .studio-shell main, html.theme-light .studio-shell section { color: #111827 !important; }
+html.theme-light .studio-shell header { background: rgba(255,255,255,.94) !important; border-color: rgba(15,23,42,.10) !important; }
+html.theme-light .studio-shell [class*="bg-[#08090a]"], html.theme-light .studio-shell [class*="bg-[#0f1011]"] { background: #ffffff !important; }
+html.theme-light .studio-shell [class*="bg-white/"] { background: rgba(255,255,255,.88) !important; border-color: rgba(15,23,42,.12) !important; }
+html.theme-light .studio-shell .bg-white { background-color: #ffffff !important; }
+html.theme-light .studio-shell .bg-slate-50, html.theme-light .studio-shell .bg-slate-100, html.theme-light .studio-shell .bg-slate-200 { background-color: #f8fafc !important; }
+html.theme-light .studio-shell .text-slate-50, html.theme-light .studio-shell .text-slate-100, html.theme-light .studio-shell .text-slate-200, html.theme-light .studio-shell .text-slate-300, html.theme-light .studio-shell .text-slate-700, html.theme-light .studio-shell .text-slate-800, html.theme-light .studio-shell .text-slate-900 { color: #111827 !important; }
+html.theme-light .studio-shell .text-slate-400, html.theme-light .studio-shell .text-slate-500, html.theme-light .studio-shell .text-slate-600 { color: #64748b !important; }
+html.theme-light .studio-shell input, html.theme-light .studio-shell textarea, html.theme-light .studio-shell select { background: #ffffff !important; color: #111827 !important; border-color: rgba(15,23,42,.14) !important; }
+html.theme-light .studio-shell option { background: #ffffff; color: #111827; }
+html.theme-light .studio-shell img.rounded-xl, html.theme-light .studio-shell img.rounded-2xl { background: #f1f5f9 !important; }
+html.theme-light .studio-shell .shadow-sm, html.theme-light .studio-shell .shadow, html.theme-light .studio-shell .shadow-md, html.theme-light .studio-shell .shadow-lg, html.theme-light .studio-shell .shadow-xl, html.theme-light .studio-shell .shadow-2xl { box-shadow: 0 0 0 1px rgba(15,23,42,.08), 0 18px 50px rgba(15,23,42,.10) !important; }
 
 /* Dark-mode compatibility for Tailwind utility pages. */
 html.theme-dark .theme-toggle { border-color: var(--theme-border) !important; background: rgba(15, 23, 42, .92) !important; color: var(--theme-text) !important; }
