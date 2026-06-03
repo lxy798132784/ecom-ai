@@ -40,9 +40,10 @@ html.theme-dark {
 }
 
 html, body, #__next { min-height: 100%; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 body {
   margin: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 12% 0%, rgba(37,99,235,.10), transparent 30rem),
     radial-gradient(circle at 88% 8%, rgba(124,58,237,.10), transparent 28rem),
@@ -121,6 +122,22 @@ img, video { max-width: 100%; }
 video, audio { color-scheme: light; }
 img.rounded-xl, video.rounded-xl, img.rounded-2xl, video.rounded-2xl { background: var(--theme-surface-soft); }
 
+/* Studio pages own their dark chrome. Keep them stable regardless of global light/dark toggle. */
+.studio-shell { background: #08090a !important; color: #f8fafc !important; overflow-x: hidden; }
+.studio-shell input, .studio-shell textarea, .studio-shell select {
+  background: #08090a !important;
+  color: #f8fafc !important;
+  border-color: rgba(255,255,255,.10) !important;
+}
+.studio-shell option { background: #08090a; color: #f8fafc; }
+.studio-shell .bg-white { background-color: rgba(255,255,255,.035) !important; }
+.studio-shell .bg-slate-50, .studio-shell .bg-slate-100, .studio-shell .bg-slate-200 { background-color: #111827 !important; }
+.studio-shell .text-slate-900, .studio-shell .text-slate-800, .studio-shell .text-slate-700, .studio-shell .text-slate-600 { color: #e5e7eb !important; }
+.studio-shell .text-slate-500 { color: #94a3b8 !important; }
+.studio-shell .text-slate-400 { color: #cbd5e1 !important; }
+.studio-shell .shadow-sm, .studio-shell .shadow, .studio-shell .shadow-md, .studio-shell .shadow-lg, .studio-shell .shadow-xl, .studio-shell .shadow-2xl { box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 20px 70px rgba(0,0,0,.35) !important; }
+.studio-shell [class*="bg-white/"] { border-color: rgba(255,255,255,.10) !important; }
+
 /* Dark-mode compatibility for Tailwind utility pages. */
 html.theme-dark .theme-toggle { border-color: var(--theme-border) !important; background: rgba(15, 23, 42, .92) !important; color: var(--theme-text) !important; }
 html.theme-dark .bg-slate-100 { background-color: #111827 !important; }
@@ -142,8 +159,47 @@ html.theme-dark img { color-scheme: light; }
 @media (max-width: 768px) {
   body { background-size: auto; }
   h1 { letter-spacing: -0.025em; }
-  .px-4 { padding-left: 1rem; padding-right: 1rem; }
+  .px-4 { padding-left: .875rem !important; padding-right: .875rem !important; }
   .py-24 { padding-top: 4rem; padding-bottom: 4rem; }
   .text-6xl { font-size: 2.75rem !important; line-height: 1.05 !important; }
-  .text-4xl { font-size: 2.25rem !important; line-height: 1.1 !important; }
+  .text-5xl { font-size: 2.25rem !important; line-height: 1.08 !important; }
+  .text-4xl { font-size: 2rem !important; line-height: 1.1 !important; }
+  .studio-shell header > div { flex-wrap: wrap; align-items: flex-start; }
+  .studio-shell header nav { display: flex !important; order: 3; width: 100%; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: none; }
+  .studio-shell header nav::-webkit-scrollbar { display: none; }
+  .studio-shell header nav a { flex: 0 0 auto; white-space: nowrap; }
+  .studio-shell .sticky { position: static !important; }
+  .studio-shell section[id="create"] { border-radius: 1.25rem !important; }
+  .studio-shell section[id="create"] .grid { grid-template-columns: 1fr !important; }
+  .studio-shell section[id="create"] .grid.grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .studio-shell section[id="create"] button { min-height: 40px; }
+  .studio-shell section[id="create"] textarea { min-height: 116px; }
+  .studio-shell .md\:grid-cols-5 { grid-template-columns: 1fr !important; }
+  .studio-shell .md\:grid-cols-3 { grid-template-columns: 1fr !important; }
+  .studio-shell .sm\:grid-cols-3 { grid-template-columns: 1fr !important; }
+  .studio-shell .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .studio-shell aside .grid-cols-2, .studio-shell section[id="gallery"] .md\:grid-cols-\[1fr_auto_auto_auto_auto\] { grid-template-columns: 1fr !important; }
+  .studio-shell .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .studio-shell button, .studio-shell a, .studio-shell label { min-width: 0; }
+  .studio-shell .flex { min-width: 0; }
+  .studio-shell .flex:not(.flex-col) { flex-wrap: wrap; }
+  .studio-shell .rounded-\[28px\] { border-radius: 1.25rem !important; }
+  .studio-shell .max-h-72, .studio-shell .max-h-64 { max-height: none !important; }
+  .media-shell header .flex { width: 100%; }
+  .media-shell header nav { display: grid !important; grid-template-columns: 1fr; overflow: visible; }
+  .media-shell header nav a, .media-shell header button { width: 100%; justify-content: center; }
+
+  .studio-shell button, .studio-shell a, .studio-shell label { overflow-wrap: anywhere; text-align: center; }
+  .studio-shell section[id="create"] .flex.flex-wrap { align-items: stretch; }
+  .studio-shell section[id="create"] .flex.flex-wrap button { flex: 1 1 calc(50% - .5rem); }
+  .studio-shell #specs .grid.grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .studio-shell #gallery .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
+  .studio-shell input[type="number"] { min-width: 0; }
+  .theme-toggle { bottom: .75rem !important; right: .75rem !important; max-width: calc(100vw - 1.5rem); }
+}
+
+
+@media (min-width: 1024px) {
+  .studio-shell .lg\:grid-cols-\[360px_minmax\(0\,1fr\)\] { grid-template-columns: 360px minmax(0, 1fr) !important; }
+  .studio-shell .lg\:col-span-2 { grid-column: span 2 / span 2; }
 }

@@ -103,7 +103,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
         <title>{pageTitle} - Image Studio AI</title>
         <meta name="description" content={pageSubtitle} />
       </Head>
-      <main className="min-h-screen bg-[#08090a] px-4 py-6 text-slate-100 md:py-10">
+      <main className="studio-shell media-shell min-h-screen bg-[#08090a] px-4 py-6 text-slate-100 md:py-10">
         <div className="mx-auto max-w-6xl">
           <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-2xl md:flex-row md:items-center md:justify-between">
             <Link href="/" className="inline-flex h-10 items-center text-sm font-semibold text-slate-400 hover:text-brand-300">← {tr.backHome}</Link>
@@ -122,7 +122,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
                 <h2 className="text-sm font-bold text-slate-50">{tr.singleFunctionPage}</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">{tr.singleFunctionDesc}</p>
                 <div className="mt-5 grid gap-2 text-xs text-slate-400">
-                  {fields.slice(0, 4).map((f, idx) => { const ft = fieldText(f); return <div key={idx} className="rounded-xl bg-white px-3 py-2 shadow-sm"><span className="font-semibold text-slate-300">{ft.name}</span> · {ft.description}</div>; })}
+                  {fields.slice(0, 4).map((f, idx) => { const ft = fieldText(f); return <div key={idx} className="rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 shadow-sm"><span className="font-semibold text-slate-200">{ft.name}</span> · {ft.description}</div>; })}
                 </div>
               </div>
             </div>

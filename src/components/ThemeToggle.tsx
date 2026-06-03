@@ -13,6 +13,7 @@ function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.classList.toggle('theme-dark', theme === 'dark');
   document.documentElement.classList.toggle('theme-light', theme === 'light');
+  document.documentElement.classList.toggle('dark', theme === 'dark');
 }
 
 export function ThemeToggle() {
