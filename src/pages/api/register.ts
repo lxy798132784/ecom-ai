@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import { kv } from '@vercel/kv';
-import { findUserByEmail, writeUser, normalizeEmail } from '../../lib/users';
+import { findUserByEmail, writeUser, normalizeEmail, deleteUserByEmail } from '../../lib/users';
 import { sendVerificationEmail } from '../../lib/email';
 import { getClientIp, verifyTurnstile } from '../../lib/security';
 
@@ -37,7 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       emailVerified: false,
     };
     await writeUser(user);
-    await sendVerificationEmail(normalizedEmail, user.name);
+    try {
+      await sendVerificationEmail(normalizedEmail, user.name);
+    } catch (mailError: any) {
+      await deleteUserByEmail(normalizedEmail).catch(() => undefined);
+      return res.status(502).json({ error: mailError?.message || '验证邮件发送失败，请稍后重试' });
+    }
 
     await kv.incr(ipKey);
     await kv.expire(ipKey, 60 * 60 * 24);

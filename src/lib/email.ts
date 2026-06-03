@@ -62,7 +62,7 @@ export async function createEmailVerification(email: string) {
 
 export async function sendVerificationEmail(email: string, name?: string) {
   const { token, url } = await createEmailVerification(email);
-  await sendMail({
+  const result = await sendMail({
     to: email,
     subject: `Verify your ${appName} email`,
     html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px;color:#111827">
@@ -74,7 +74,11 @@ export async function sendVerificationEmail(email: string, name?: string) {
       <p style="font-size:12px;color:#9ca3af">If you did not create this account, you can ignore this email.</p>
     </div>`,
   });
-  return { token, url };
+  if (result.skipped) {
+    await kv.del(`verify-email:${token}`).catch(() => undefined);
+    throw new Error('Email delivery is not configured. Please set SMTP_HOST/SMTP_USER/SMTP_PASS or RESEND_API_KEY.');
+  }
+  return { token, url, provider: result.provider };
 }
 
 export async function createPasswordReset(email: string) {

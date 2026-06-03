@@ -234,10 +234,22 @@ export default function AdminPage() {
         </header>
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.userCount}</p><p className="text-2xl font-bold">{users.length}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">PRO</p><p className="text-2xl font-bold">{users.filter(u => u.plan === 'pro').length}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.monthUsage}</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p></div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200"><p className="text-xs text-slate-400">{tr.creditBalance}</p><p className="text-2xl font-bold">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p></div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.userCount}</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">PRO</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.filter(u => u.plan === 'pro').length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.monthUsage}</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{tr.creditBalance}</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
+          </div>
         </section>
 
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">

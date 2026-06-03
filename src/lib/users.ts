@@ -24,3 +24,7 @@ export async function writeUser(user: User) {
   const email = normalizeEmail(user.email);
   await kv.hset('users', { [email]: { ...user, email } });
 }
+
+export async function deleteUserByEmail(email: string) {
+  await kv.hdel('users', normalizeEmail(email));
+}
