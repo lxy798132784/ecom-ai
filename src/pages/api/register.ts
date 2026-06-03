@@ -24,7 +24,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (ipCount >= 3) return res.status(429).json({ error: '注册过于频繁，请明天再试' });
 
     const exists = await findUserByEmail(normalizedEmail);
-    if (exists) return res.status(409).json({ error: '该邮箱已注册' });
+    if (exists) {
+      if (exists.emailVerified === false) {
+        try {
+          await sendVerificationEmail(normalizedEmail, exists.name);
+        } catch (mailError: any) {
+          return res.status(502).json({ error: mailError?.message || '验证邮件发送失败，请稍后重试' });
+        }
+        return res.status(200).json({ ok: true, message: '该邮箱已注册但尚未验证，我们已重新发送验证邮件', requiresEmailVerification: true });
+      }
+      return res.status(409).json({ error: '该邮箱已注册' });
+    }
 
     const hashed = await bcrypt.hash(password, 10);
     const user = {
