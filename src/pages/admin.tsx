@@ -332,8 +332,8 @@ export default function AdminPage() {
             <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.freeUsage || 0) + Number(u.proUsage || 0), 0)}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
-            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{tr.creditBalance}</p>
-            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.credits || 0), 0)}</p>
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">总积分</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))), 0)}</p>
           </div>
         </section>
 
