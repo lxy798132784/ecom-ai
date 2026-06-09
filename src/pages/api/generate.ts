@@ -181,7 +181,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const charged = await chargeAfterSuccess(email, usageCheck);
 
-    return res.json({ url: storedUrl, history: savedHistory, historyItems: saved.items, historySaved: savedHistory.includes(storedUrl), usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, storedImage: storedUrl !== url, ...meta });
+    return res.json({ url: storedUrl, history: savedHistory, historyItems: saved.items, historySaved: savedHistory.includes(storedUrl), usage: charged.usage, limit: charged.limit, freeUsage: charged.freeUsage, proUsage: charged.proUsage, credits: charged.credits, totalPoints: Math.max(0, Number(charged.limit || 0) - Number(charged.usage || 0)) + Number(charged.credits || 0), paidWith: charged.paidWith, plan: charged.plan, pointsCost, quality: generationOptions.quality, size: generationOptions.size, chargedAfterSuccess: true, storedImage: storedUrl !== url, ...meta });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: e.message || 'Generation failed' });

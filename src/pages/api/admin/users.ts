@@ -170,6 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         freeUsage: freeUsage || 0,
         proUsage: proUsage || 0,
         credits: credits || 0,
+        totalPoints: Math.max(0, ((user.plan === 'pro' ? 2000 : 10) - (user.plan === 'pro' ? (proUsage || 0) : (freeUsage || 0)))) + (credits || 0),
         history: filterDeletedImages(history || [], deletedHistory),
         favorites: filterDeletedImages(favorites || [], deletedFav),
         historyCountPreview: filterDeletedImages(history || [], deletedHistory).length,

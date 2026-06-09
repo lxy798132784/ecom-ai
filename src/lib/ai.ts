@@ -4,13 +4,7 @@ import path from 'path';
 import os from 'os';
 import { File as NodeFile } from 'buffer';
 import sharp from 'sharp';
-
-const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL || 'https://ai-pixel.online/v1',
-});
+import { getActiveImageProviders, RuntimeImageProvider } from './imageProviders';
 
 type ModelProvider = 'openai';
 
@@ -86,21 +80,46 @@ function imageDataToUrl(data: any): string {
   return data?.url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : '');
 }
 
+function providerClient(provider: RuntimeImageProvider) {
+  return new OpenAI({ apiKey: provider.apiKey, baseURL: provider.baseURL });
+}
+
+async function withImageProviderFallback<T>(operation: (client: OpenAI, provider: RuntimeImageProvider) => Promise<T>): Promise<{ value: T; provider: RuntimeImageProvider; attempts: number }> {
+  const providers = await getActiveImageProviders();
+  if (!providers.length) throw new Error('No image providers configured');
+  const errors: string[] = [];
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    try {
+      const value = await operation(providerClient(provider), provider);
+      return { value, provider, attempts: i + 1 };
+    } catch (e: any) {
+      const msg = e?.message || e?.error?.message || String(e || 'unknown error');
+      errors.push(`${provider.name || provider.id}: ${msg}`);
+      console.error('image provider failed', { provider: provider.name || provider.id, baseURL: provider.baseURL, model: provider.model, message: msg });
+    }
+  }
+  throw new Error(`所有生图模型均失败：${errors.slice(-3).join(' | ')}`);
+}
+
 export async function removeBackground(imageBase64: string, customPrompt?: string, options?: ImageGenerationOptions): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
   const extra = customPrompt ? `, ${customPrompt}` : '';
   const opt = normalizeOptions(options);
   const fullPrompt = `Product on pure white background, professional product photography lighting, no shadows, centered, ${QUALITY_PROMPT[opt.quality]}${extra}`;
   try {
-    const resp = await openai.images.edit({
-      model: IMAGE_MODEL,
-      image: file,
-      prompt: fullPrompt,
-      n: 1,
-      size: opt.apiSize,
-      quality: opt.quality,
-    } as any);
-    return resizeOutput(imageDataToUrl(resp.data?.[0]), options);
+    const result = await withImageProviderFallback(async (client, provider) => {
+      const resp = await client.images.edit({
+        model: provider.model,
+        image: file,
+        prompt: fullPrompt,
+        n: 1,
+        size: opt.apiSize,
+        quality: opt.quality,
+      } as any);
+      return imageDataToUrl(resp.data?.[0]);
+    });
+    return resizeOutput(result.value, options);
   } finally { fs.unlink(filePath, () => {}); }
 }
 
@@ -116,43 +135,59 @@ export async function generateLifestyleScene(imageBase64: string, scene: string,
   const opt = normalizeOptions(options);
   const fullPrompt = `Place this product in a beautiful ${sceneMap[scene] || scene}. Professional photography, natural lighting, product clearly visible, realistic, ${QUALITY_PROMPT[opt.quality]}${extra}`;
   try {
-    const resp = await openai.images.edit({
-      model: IMAGE_MODEL,
-      image: file,
-      prompt: fullPrompt,
-      n: 1,
-      size: opt.apiSize,
-      quality: opt.quality,
-    } as any);
-    return resizeOutput(imageDataToUrl(resp.data?.[0]), options);
+    const result = await withImageProviderFallback(async (client, provider) => {
+      const resp = await client.images.edit({
+        model: provider.model,
+        image: file,
+        prompt: fullPrompt,
+        n: 1,
+        size: opt.apiSize,
+        quality: opt.quality,
+      } as any);
+      return imageDataToUrl(resp.data?.[0]);
+    });
+    return resizeOutput(result.value, options);
   } finally { fs.unlink(filePath, () => {}); }
 }
 
 export async function customEdit(imageBase64: string, prompt: string, options?: ImageGenerationOptions): Promise<string> {
   const { file, filePath } = base64ToFileObject(imageBase64);
   try {
-    const resp = await openai.images.edit({
-      model: IMAGE_MODEL,
-      image: file,
-      prompt: `Transform this product photo: ${prompt}. Professional e-commerce photography, ${QUALITY_PROMPT[normalizeOptions(options).quality]}.`,
-      n: 1,
-      size: normalizeOptions(options).apiSize,
-      quality: normalizeOptions(options).quality,
-    } as any);
-    return resizeOutput(imageDataToUrl(resp.data?.[0]), options);
+    const opt = normalizeOptions(options);
+    const result = await withImageProviderFallback(async (client, provider) => {
+      const resp = await client.images.edit({
+        model: provider.model,
+        image: file,
+        prompt: `Transform this product photo: ${prompt}. Professional e-commerce photography, ${QUALITY_PROMPT[opt.quality]}.`,
+        n: 1,
+        size: opt.apiSize,
+        quality: opt.quality,
+      } as any);
+      return imageDataToUrl(resp.data?.[0]);
+    });
+    return resizeOutput(result.value, options);
   } finally { fs.unlink(filePath, () => {}); }
 }
 
 export async function generateProductImage(prompt: string, options?: ImageGenerationOptions): Promise<string> {
+  const result = await generateProductImageWithMeta(prompt, options);
+  return result.url;
+}
+
+async function generateProductImageWithMeta(prompt: string, options?: ImageGenerationOptions): Promise<DispatchResult> {
   const opt = normalizeOptions(options);
-  const resp = await openai.images.generate({
-    model: IMAGE_MODEL,
-    prompt: `Professional e-commerce product photography, ${prompt}, studio lighting, ${QUALITY_PROMPT[opt.quality]}, white background option`,
-    n: 1,
-    size: opt.apiSize,
-    quality: opt.quality,
-  } as any);
-  return resizeOutput(imageDataToUrl(resp.data?.[0]), options);
+  const result = await withImageProviderFallback(async (client, provider) => {
+    const resp = await client.images.generate({
+      model: provider.model,
+      prompt: `Professional e-commerce product photography, ${prompt}, studio lighting, ${QUALITY_PROMPT[opt.quality]}, white background option`,
+      n: 1,
+      size: opt.apiSize,
+      quality: opt.quality,
+    } as any);
+    return imageDataToUrl(resp.data?.[0]);
+  });
+  const url = await resizeOutput(result.value, options);
+  return { url, provider: 'openai', model: result.provider.model, cost: 8, attempts: result.attempts, providerName: result.provider.name, baseURL: result.provider.baseURL };
 }
 
 export interface DispatchResult {
@@ -161,12 +196,14 @@ export interface DispatchResult {
   model: string;
   cost: number;
   attempts: number;
+  providerName?: string;
+  baseURL?: string;
 }
 
 export async function dispatchGeneration(prompt: string, preferredProvider?: ModelProvider, options?: ImageGenerationOptions): Promise<DispatchResult> {
-  const url = await generateProductImage(prompt, options);
-  if (!url) throw new Error('Image generation returned no image URL');
-  return { url, provider: 'openai', model: IMAGE_MODEL, cost: 8, attempts: 1 };
+  const result = await generateProductImageWithMeta(prompt, options);
+  if (!result.url) throw new Error('Image generation returned no image URL');
+  return result;
 }
 
 export async function dispatchBatch(

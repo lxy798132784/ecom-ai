@@ -238,9 +238,11 @@ export default function Home() {
   const [usageCount, setUsageCount] = useState(0);
   const [usageLimit, setUsageLimit] = useState(5);
   const [credits, setCredits] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [accountPlan, setAccountPlan] = useState<'free'|'pro'>('free');
 
   const usageLeft = Math.max(0, usageLimit - usageCount);
+  const displayPoints = totalPoints || (usageLeft + credits);
   const pointsCost = calcPoints(genQuality, genSize);
   const displaySize = genSize === 'auto' ? tr.sizeAuto : genSize;
   const compressionPercent = Math.round(compressionQuality * 100);
@@ -255,6 +257,7 @@ export default function Home() {
     const h = await fetch('/api/history').then(r => r.json()).catch(() => ({}));
     if (h.items) setHistoryItems(h.items); else if (h.history) setHistoryItems(uniqueImages(h.history).map((url: string) => ({ url })));
     if (h.credits !== undefined) setCredits(h.credits);
+    if (h.totalPoints !== undefined) setTotalPoints(h.totalPoints);
     if (h.plan === 'pro' || h.plan === 'free') setAccountPlan(h.plan);
     if (h.limit !== undefined) setUsageLimit(h.limit);
     if (h.plan === 'pro' && h.proUsage !== undefined) setUsageCount(h.proUsage); else if (h.plan === 'free' && h.freeUsage !== undefined) setUsageCount(h.freeUsage); else if (h.usage !== undefined) setUsageCount(h.usage);
@@ -339,6 +342,7 @@ export default function Home() {
       if (data.limit !== undefined) setUsageLimit(data.limit);
       if (data.plan === 'pro' && data.proUsage !== undefined) setUsageCount(data.proUsage); else if (data.plan === 'free' && data.freeUsage !== undefined) setUsageCount(data.freeUsage); else if (data.usage !== undefined) setUsageCount(data.usage);
       if (data.credits !== undefined) setCredits(data.credits);
+      if (data.totalPoints !== undefined) setTotalPoints(data.totalPoints);
     } catch (e: any) { setError(e.message); setTasks(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message, finishedAt: Date.now() } : x)); }
     finally { setLoading(false); }
   };
@@ -379,7 +383,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2 text-xs">
             <button onClick={toggleLang} className="rounded-lg border border-white/10 px-2 py-1">{lang === 'zh' ? 'EN' : '中'}</button>
-            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {usageLeft}+{credits}</span><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => { setShowRegister(true); setCaptchaToken(''); }} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
+            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {displayPoints} {tr.times}</span><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => { setShowRegister(true); setCaptchaToken(''); }} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
           </div>
         </div>
       </header>

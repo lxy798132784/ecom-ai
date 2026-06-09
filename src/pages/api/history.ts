@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const plan = user?.plan || (token.plan as string) || 'free';
     const limit = plan === 'pro' ? PRO_LIMIT : FREE_LIMIT;
     const usage = plan === 'pro' ? proUsage : freeUsage;
-    return res.json({ history: itemUrls(items), items, credits, usage, limit, plan, freeUsage, proUsage });
+    return res.json({ history: itemUrls(items), items, credits, usage, limit, plan, freeUsage, proUsage, totalPoints: Math.max(0, limit - usage) + credits });
   }
 
   if (req.method === 'POST') {

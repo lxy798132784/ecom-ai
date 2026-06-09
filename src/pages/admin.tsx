@@ -11,6 +11,7 @@ type AdminUser = {
   usage: number;
   freeUsage?: number;
   proUsage?: number;
+  totalPoints?: number;
   credits: number;
   emailVerified?: boolean;
   emailVerifiedAt?: string;
@@ -23,6 +24,18 @@ type AdminUser = {
   favoritesCountPreview?: number;
   collections?: { id: string; name: string; urls: string[] }[];
   mediaHistory?: { id: string; kind: string; url: string; prompt?: string; createdAt?: string }[];
+};
+
+type AdminImageProvider = {
+  id: string;
+  name: string;
+  baseURL: string;
+  model: string;
+  enabled: boolean;
+  priority: number;
+  hasKey?: boolean;
+  keyPreview?: string;
+  apiKey?: string;
 };
 
 async function imageHash(url: string) {
@@ -67,6 +80,8 @@ export default function AdminPage() {
   const [lang, setLangState] = useState<Lang>('zh');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', name: '', password: '', plan: 'free', credits: 0, emailVerified: true });
+  const [providers, setProviders] = useState<AdminImageProvider[]>([]);
+  const [newProvider, setNewProvider] = useState({ name: '', baseURL: '', model: 'gpt-image-2', apiKey: '', priority: 100, enabled: true });
   const tr = t[lang];
   const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); saveLang(next); };
 
@@ -81,7 +96,18 @@ export default function AdminPage() {
     const data = await res.json();
     setLoggedIn(Boolean(data.loggedIn));
     setAdminEmail(data.email || '');
-    if (data.loggedIn) await loadUsers();
+    if (data.loggedIn) { await loadUsers(); await loadProviders(); }
+  };
+
+  const loadProviders = async () => {
+    try {
+      const res = await fetch('/api/admin/image-providers');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tr.failed);
+      setProviders(data.providers || []);
+    } catch (e: any) {
+      setError(e.message || tr.failed);
+    }
   };
 
   const loadUsers = async () => {
@@ -108,6 +134,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error || tr.authError);
       setLoggedIn(true); setAdminEmail(data.email || email); setPassword('');
       await loadUsers();
+      await loadProviders();
     } catch (e: any) { setError(e.message || tr.authError); }
     setLoading(false);
   };
@@ -155,6 +182,35 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+  const saveProvider = async (provider?: AdminImageProvider) => {
+    const payload = provider || newProvider;
+    setMessage('保存生图模型配置中...'); setError('');
+    try {
+      const res = await fetch('/api/admin/image-providers', {
+        method: provider?.id ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tr.failed);
+      setProviders(data.providers || []);
+      if (!provider?.id) setNewProvider({ name: '', baseURL: '', model: 'gpt-image-2', apiKey: '', priority: 100, enabled: true });
+      setMessage('生图模型配置已保存');
+    } catch (e: any) {
+      setError(e.message || tr.failed);
+    }
+  };
+
+  const deleteProvider = async (provider: AdminImageProvider) => {
+    if (!confirm(`删除生图模型配置：${provider.name || provider.baseURL}？`)) return;
+    try {
+      const res = await fetch('/api/admin/image-providers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: provider.id }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tr.failed);
+      setProviders(data.providers || []);
+      setMessage('生图模型配置已删除');
+    } catch (e: any) { setError(e.message || tr.failed); }
   };
 
 
@@ -281,6 +337,35 @@ export default function AdminPage() {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
+          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">生图模型配置</h2>
+              <p className="text-sm text-slate-500">按优先级从小到大调用；当前配置失败会自动回落到下一条，最后回落到 Vercel 环境变量 OPENAI_*。</p>
+            </div>
+            <button onClick={loadProviders} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">刷新模型</button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-6">
+            <input value={newProvider.name} onChange={e => setNewProvider(v => ({ ...v, name: e.target.value }))} placeholder="名称，如 SafeAPI 主线路" className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-1" />
+            <input value={newProvider.baseURL} onChange={e => setNewProvider(v => ({ ...v, baseURL: e.target.value }))} placeholder="Base URL，如 https://safeapi.vip/v1" className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-2" />
+            <input value={newProvider.model} onChange={e => setNewProvider(v => ({ ...v, model: e.target.value }))} placeholder="模型名，如 gpt-image-2" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <input type="password" value={newProvider.apiKey} onChange={e => setNewProvider(v => ({ ...v, apiKey: e.target.value }))} placeholder="API Key" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <button type="button" onClick={() => saveProvider()} className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white">添加模型</button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {providers.map(p => <div key={p.id} className="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs md:grid-cols-12 md:items-center">
+              <input value={p.name} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, name: e.target.value } : x))} className="rounded-lg border border-slate-200 px-2 py-2 md:col-span-2" />
+              <input value={p.baseURL} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, baseURL: e.target.value } : x))} className="rounded-lg border border-slate-200 px-2 py-2 md:col-span-3" />
+              <input value={p.model} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, model: e.target.value } : x))} className="rounded-lg border border-slate-200 px-2 py-2 md:col-span-2" />
+              <input type="password" value={p.apiKey || ''} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, apiKey: e.target.value } : x))} placeholder={p.hasKey ? `留空保留 ${p.keyPreview}` : 'API Key'} className="rounded-lg border border-slate-200 px-2 py-2 md:col-span-2" />
+              <input type="number" value={p.priority} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, priority: Number(e.target.value) } : x))} className="rounded-lg border border-slate-200 px-2 py-2" />
+              <label className="flex items-center gap-1"><input type="checkbox" checked={p.enabled !== false} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, enabled: e.target.checked } : x))} />启用</label>
+              <div className="flex gap-1"><button onClick={() => saveProvider(p)} className="rounded-lg bg-brand-600 px-2 py-2 font-semibold text-white">保存</button><button onClick={() => deleteProvider(p)} className="rounded-lg bg-red-50 px-2 py-2 font-semibold text-red-600">删</button></div>
+            </div>)}
+            {!providers.length && <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">暂无后台模型配置。系统仍会使用 Vercel 环境变量 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_IMAGE_MODEL。</div>}
+          </div>
+        </section>
+
         <form onSubmit={createUser} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
           <div className="mb-3 flex flex-col gap-3 md:mb-4 md:flex-row md:items-end md:justify-between">
             <div>
@@ -328,7 +413,7 @@ export default function AdminPage() {
                 <label className="space-y-1"><span className="text-slate-500">{tr.newPassword}</span><input type="password" value={u.newPassword || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
               </div>
               <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
-                <div>{tr.remainingCredits}: <b>{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</b></div>
+                <div>{tr.creditBalance}: <b>{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))}</b></div>
                 <div>{tr.createdAt}: <b className="break-all">{u.createdAt || '-'}</b></div>
                 <div>{tr.historyCount.replace('{count}', String(u.history?.length || 0))}</div>
                 <div>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</div>
@@ -363,7 +448,7 @@ export default function AdminPage() {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.verificationCol}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">{tr.remainingCredits}</th><th className="text-left p-3">{tr.creditBalance}</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">{tr.accountName}</th><th className="text-left p-3">{tr.verificationCol}</th><th className="text-left p-3">{tr.passwordCol}</th><th className="text-left p-3">{tr.planCol}</th><th className="text-left p-3">{tr.monthUsageCol}</th><th className="text-left p-3">总积分</th><th className="text-left p-3">充值积分</th><th className="text-left p-3">{tr.works}</th><th className="text-left p-3">{tr.createdAt}</th><th className="text-left p-3">{tr.actions}</th></tr></thead>
               <tbody>
                 {filtered.map(u => <Fragment key={u.email}>
                   <tr className="border-t border-slate-100">
@@ -379,7 +464,7 @@ export default function AdminPage() {
                     </td>
                     <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
                     <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} {tr.times} · pro {u.proUsage || 0} {tr.times}</div></td>
-                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0))}</span></td>
+                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
                     <td className="p-3 text-xs text-slate-500">{tr.historyCount.replace('{count}', String(u.history?.length || 0))}<br/>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}<br/>{tr.collectionsCount.replace('{count}', String(u.collections?.length || 0))}<br/>{tr.mediaCount.replace('{count}', String(u.mediaHistory?.length || 0))}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>
