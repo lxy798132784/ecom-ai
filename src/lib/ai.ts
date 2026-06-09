@@ -5,7 +5,7 @@ import os from 'os';
 import { File as NodeFile } from 'buffer';
 import sharp from 'sharp';
 
-const IMAGE_MODEL = 'gpt-image-2';
+const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
