@@ -17,7 +17,7 @@ export default function PayResult() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/pay/ezfpy/order?out_trade_no=${encodeURIComponent(outTradeNo)}`);
+      const res = await fetch(`/api/pay/order?out_trade_no=${encodeURIComponent(outTradeNo)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '订单查询失败');
       setOrder(data.order);

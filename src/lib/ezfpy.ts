@@ -1,44 +1,11 @@
 import crypto from 'crypto';
-import { kv } from '@vercel/kv';
-import { normalizeEmail } from './users';
+import { PaymentOrder, PAYMENT_PACKS, PaymentPack, createOutTradeNo, getOrder, saveOrder, markOrderPaid, getPaymentPack, siteUrl } from './payments/core';
 
 export type EzfpyPayType = 'alipay' | 'wxpay' | 'qqpay';
-export type PaymentPack = {
-  id: string;
-  name: string;
-  money: string;
-  credits?: number;
-  plan?: 'pro';
-};
-
-export type PaymentOrder = {
-  outTradeNo: string;
-  email: string;
-  packId: string;
-  name: string;
-  money: string;
-  credits?: number;
-  plan?: 'pro';
-  payType: EzfpyPayType;
-  status: 'pending' | 'paid' | 'failed';
-  createdAt: string;
-  paidAt?: string;
-  tradeNo?: string;
-  rawNotify?: Record<string, any>;
-};
-
-export const PAYMENT_PACKS: PaymentPack[] = [
-  { id: 'credits_50', name: '50积分包', money: '2.00', credits: 50 },
-  { id: 'credits_200', name: '200积分包', money: '7.00', credits: 200 },
-  { id: 'credits_500', name: '500积分包', money: '18.00', credits: 500 },
-  { id: 'pro_monthly', name: 'PRO月付 · 2500积分/月', money: '75.00', plan: 'pro' },
-];
+export type { PaymentOrder, PaymentPack };
+export { PAYMENT_PACKS, createOutTradeNo, getOrder, saveOrder, markOrderPaid, getPaymentPack };
 
 export const PAY_TYPES: EzfpyPayType[] = ['alipay', 'wxpay', 'qqpay'];
-
-export function getPaymentPack(id: string) {
-  return PAYMENT_PACKS.find(p => p.id === id);
-}
 
 export function normalizePayType(type: any): EzfpyPayType {
   return PAY_TYPES.includes(type) ? type : 'alipay';
@@ -46,10 +13,6 @@ export function normalizePayType(type: any): EzfpyPayType {
 
 function env(name: string, fallback = '') {
   return String(process.env[name] || fallback).trim();
-}
-
-export function siteUrl() {
-  return env('NEXT_PUBLIC_SITE_URL', 'https://ecom-ai-five.vercel.app').replace(/\/+$/, '');
 }
 
 export function ezfpyBaseUrl() {
@@ -81,59 +44,15 @@ export function verifySign(params: Record<string, any>, key: string) {
   return signParams(params, key).toLowerCase() === sign;
 }
 
-export function orderKey(outTradeNo: string) {
-  return `pay:ezfpy:order:${outTradeNo}`;
-}
-
-export function userOrdersKey(email: string) {
-  return `pay:ezfpy:user:${normalizeEmail(email)}`;
-}
-
-export function createOutTradeNo() {
-  const now = new Date();
-  const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  return `ECOM${stamp}${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-}
-
-export async function saveOrder(order: PaymentOrder) {
-  await kv.set(orderKey(order.outTradeNo), order);
-  await kv.lpush(userOrdersKey(order.email), order.outTradeNo);
-  await kv.ltrim(userOrdersKey(order.email), 0, 49);
-  return order;
-}
-
-export async function getOrder(outTradeNo: string): Promise<PaymentOrder | null> {
-  return (await kv.get<PaymentOrder>(orderKey(outTradeNo))) || null;
-}
-
-export async function markOrderPaid(outTradeNo: string, patch: Partial<PaymentOrder>) {
-  const order = await getOrder(outTradeNo);
-  if (!order) return null;
-  const updated: PaymentOrder = { ...order, ...patch, status: 'paid', paidAt: patch.paidAt || new Date().toISOString() };
-  await kv.set(orderKey(outTradeNo), updated);
-  return updated;
-}
-
-export async function applyPaidOrder(order: PaymentOrder) {
-  const email = normalizeEmail(order.email);
-  if (order.credits) {
-    const current = (await kv.get<number>(`credits:${email}`)) || 0;
-    await kv.set(`credits:${email}`, current + order.credits);
-  }
-  if (order.plan === 'pro') {
-    const user = await kv.hget('users', email) as any;
-    if (user) {
-      user.plan = 'pro';
-      await kv.hset('users', { [email]: user });
-    }
-  }
+export async function applyPaidOrder(_order: PaymentOrder) {
+  // Backward compatibility shim. Fulfillment moved into payments/core.markOrderPaid for idempotency.
 }
 
 export function buildSubmitUrl(order: PaymentOrder) {
   const cfg = getEzfpyConfig();
   const params: Record<string, string> = {
     pid: cfg.pid,
-    type: order.payType,
+    type: String(order.channel === 'wxpay' ? 'wxpay' : order.channel === 'qqpay' ? 'qqpay' : 'alipay'),
     out_trade_no: order.outTradeNo,
     notify_url: `${cfg.site}/api/pay/ezfpy/notify`,
     return_url: `${cfg.site}/pay/result?out_trade_no=${encodeURIComponent(order.outTradeNo)}`,

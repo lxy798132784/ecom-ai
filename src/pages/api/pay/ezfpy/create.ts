@@ -16,18 +16,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!pack) return res.status(400).json({ error: '无效的积分包' });
     const email = normalizeEmail(String(token.email));
     const payType = normalizePayType(type);
-    const order: PaymentOrder = {
-      outTradeNo: createOutTradeNo(),
+    const createdAt = new Date();
+    const order = {
+      outTradeNo: createOutTradeNo('EZ'),
       email,
       packId: pack.id,
       name: pack.name,
       money: pack.money,
       credits: pack.credits,
       plan: pack.plan,
-      payType,
+      provider: 'ezfpy',
+      channel: payType,
       status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
+      createdAt: createdAt.toISOString(),
+      expireAt: new Date(createdAt.getTime() + 30 * 60 * 1000).toISOString(),
+      payType,
+    } as any;
     await saveOrder(order);
     const payUrl = buildSubmitUrl(order);
     return res.json({ ok: true, order, payUrl });

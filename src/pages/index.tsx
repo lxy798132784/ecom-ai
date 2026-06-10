@@ -243,8 +243,10 @@ export default function Home() {
   const [credits, setCredits] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
   const [accountPlan, setAccountPlan] = useState<'free'|'pro'>('free');
-  const [payType, setPayType] = useState<'alipay'|'wxpay'|'qqpay'>('alipay');
+  const [payType, setPayType] = useState<'alipay'|'wechat_native'|'wechat_h5'|'ezfpy_alipay'>('alipay');
   const [payLoading, setPayLoading] = useState('');
+  const [payProviders, setPayProviders] = useState<Record<string, boolean>>({});
+  const [wechatQr, setWechatQr] = useState<{ orderNo: string; qrDataUrl: string } | null>(null);
 
   const usageLeft = Math.max(0, usageLimit - usageCount);
   const displayPoints = totalPoints || (usageLeft + credits);
@@ -256,7 +258,7 @@ export default function Home() {
   const selectedReferenceImages = selectedRefUrls.filter(url => references.includes(url));
   const primaryReference = (activeRef && selectedReferenceImages.includes(activeRef)) ? activeRef : (selectedReferenceImages[0] || '');
 
-  useEffect(() => { setLangState(getLang()); setCollections(readLocalJson(COLLECTION_KEY, [])); fetch('/api/collections').then(r => r.json()).then(d => { if (d.items) { setCollections(d.items); writeLocalJson(COLLECTION_KEY, d.items); } }).catch(() => {}); setAgentMessages(readLocalJson(AGENT_KEY, [])); fetch('/api/media-status').then(r => r.json()).then(setMediaStatus).catch(() => {}); }, []);
+  useEffect(() => { setLangState(getLang()); setCollections(readLocalJson(COLLECTION_KEY, [])); fetch('/api/collections').then(r => r.json()).then(d => { if (d.items) { setCollections(d.items); writeLocalJson(COLLECTION_KEY, d.items); } }).catch(() => {}); setAgentMessages(readLocalJson(AGENT_KEY, [])); fetch('/api/media-status').then(r => r.json()).then(setMediaStatus).catch(() => {}); fetch('/api/pay/providers').then(r => r.json()).then(d => d.providers && setPayProviders(d.providers)).catch(() => {}); }, []);
   const refreshGallery = useCallback(async () => {
     if (!loggedIn) return;
     const h = await fetch('/api/history').then(r => r.json()).catch(() => ({}));
@@ -325,14 +327,17 @@ export default function Home() {
 
   const startPayment = async (packId: string) => {
     if (!loggedIn) { setShowPay(false); setShowLogin(true); return; }
-    setPayLoading(packId); setError('');
+    setPayLoading(packId); setError(''); setWechatQr(null);
     try {
-      const res = await fetch('/api/pay/ezfpy/create', {
+      const endpoint = payType === 'alipay' ? '/api/pay/alipay/create' : payType === 'wechat_native' || payType === 'wechat_h5' ? '/api/pay/wechat/create' : '/api/pay/ezfpy/create';
+      const body = payType === 'wechat_h5' ? { packId, mode: 'h5' } : payType === 'wechat_native' ? { packId, mode: 'native' } : payType === 'ezfpy_alipay' ? { packId, type: 'alipay' } : { packId };
+      const res = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packId, type: payType }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || '创建支付订单失败');
+      if (data.qrDataUrl) { setWechatQr({ orderNo: data.order?.outTradeNo || '', qrDataUrl: data.qrDataUrl }); return; }
       window.location.href = data.payUrl;
     } catch (e: any) {
       setError(e.message || '创建支付订单失败');
@@ -589,24 +594,38 @@ export default function Home() {
         <button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button>
       </Modal>
       <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => { setShowForgot(false); setCaptchaToken(''); }}>{forgotSent ? <div className="text-center"><p className="mb-4 text-5xl">📧</p><p className="mb-2 font-medium text-slate-700">{tr.emailSent}</p><p className="mb-4 text-sm text-slate-500">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p><button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.backToLogin}</button></div> : <>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<p className="mb-4 text-sm text-slate-500">{tr.forgotDesc}</p><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doForgot} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.sendResetLink}</button></>}</Modal>
-      <Modal show={showPay} title={'🚀 购买积分 / 升级 PRO'} onClose={() => setShowPay(false)}>
+      <Modal show={showPay} title={'🚀 购买积分 / 升级 PRO'} onClose={() => { setShowPay(false); setWechatQr(null); }}>
         <div className="space-y-4">
           <p className="text-center text-sm text-slate-500">当前总积分：<b>{displayPoints}</b>，本次预计消耗：<b>{pointsCost}</b> 积分</p>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            {[['alipay','支付宝'],['wxpay','微信支付'],['qqpay','QQ钱包']].map(([type,label]) => <button key={type} onClick={() => setPayType(type as any)} className={`rounded-xl border px-3 py-2 font-semibold ${payType === type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>{label}</button>)}
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {[
+              { type: 'alipay', label: '支付宝官方', ready: payProviders.alipay, hint: '电脑/手机网页跳转支付宝' },
+              { type: 'wechat_native', label: '微信扫码', ready: payProviders.wechat, hint: '生成二维码，用微信扫码' },
+              { type: 'wechat_h5', label: '微信 H5', ready: payProviders.wechat, hint: '手机浏览器拉起微信' },
+              { type: 'ezfpy_alipay', label: '易支付备用', ready: payProviders.ezfpy, hint: '仅作备用通道' },
+            ].map(item => <button key={item.type} disabled={!item.ready} onClick={() => setPayType(item.type as any)} className={`rounded-xl border px-3 py-2 text-left font-semibold ${payType === item.type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'} disabled:cursor-not-allowed disabled:opacity-45`}>
+              <span className="block">{item.label} {item.ready ? '✅' : '未配置'}</span><span className="text-[11px] font-normal text-slate-400">{item.hint}</span>
+            </button>)}
           </div>
+          {!payProviders.alipay && !payProviders.wechat && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">官方支付尚未配置密钥。Vercel 配好支付宝或微信支付环境变量后，按钮会自动启用。</div>}
+          {wechatQr && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+            <div className="mb-2 text-sm font-bold text-emerald-800">微信支付二维码</div>
+            <img src={wechatQr.qrDataUrl} alt="微信支付二维码" className="mx-auto h-48 w-48 rounded-xl bg-white p-2" />
+            <p className="mt-2 break-all text-xs text-emerald-700">订单号：{wechatQr.orderNo}</p>
+            <button onClick={() => { window.location.href = `/pay/result?out_trade_no=${encodeURIComponent(wechatQr.orderNo)}`; }} className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">我已支付，查看结果</button>
+          </div>}
           <div className="grid gap-3">
             {[
               { id: 'credits_50', title: '50 积分包', desc: '适合轻量试稿', price: '¥2' },
               { id: 'credits_200', title: '200 积分包', desc: '适合持续创作', price: '¥7' },
               { id: 'credits_500', title: '500 积分包', desc: '高性价比积分包', price: '¥18' },
               { id: 'pro_monthly', title: '升级 PRO', desc: '每月 2500 积分', price: '¥75/月' },
-            ].map(pack => <button key={pack.id} disabled={Boolean(payLoading)} onClick={() => startPayment(pack.id)} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:border-brand-400 disabled:opacity-60">
+            ].map(pack => <button key={pack.id} disabled={Boolean(payLoading) || (payType === 'alipay' && !payProviders.alipay) || ((payType === 'wechat_native' || payType === 'wechat_h5') && !payProviders.wechat) || (payType === 'ezfpy_alipay' && !payProviders.ezfpy)} onClick={() => startPayment(pack.id)} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-60">
               <span><span className="block font-bold text-slate-900">{pack.title}</span><span className="text-xs text-slate-500">{pack.desc}</span></span>
               <span className="text-lg font-black text-brand-600">{payLoading === pack.id ? '创建中...' : pack.price}</span>
             </button>)}
           </div>
-          <p className="text-center text-xs text-slate-400">支付由易支付跳转处理，支付成功后自动到账；如果未及时到账，可在支付结果页刷新。</p>
+          <p className="text-center text-xs text-slate-400">优先使用官方支付宝/微信支付；支付成功后由官方异步通知到账，结果页可刷新查询。</p>
           <button onClick={() => setShowPay(false)} className="w-full text-sm text-slate-400">{tr.later}</button>
         </div>
       </Modal>
