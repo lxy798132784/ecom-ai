@@ -599,15 +599,14 @@ export default function Home() {
           <p className="text-center text-sm text-slate-500">当前总积分：<b>{displayPoints}</b>，本次预计消耗：<b>{pointsCost}</b> 积分</p>
           <div className="grid grid-cols-2 gap-2 text-sm">
             {[
-              { type: 'alipay', label: '支付宝官方', ready: payProviders.alipay, hint: '电脑/手机网页跳转支付宝' },
-              { type: 'wechat_native', label: '微信扫码', ready: payProviders.wechat, hint: '生成二维码，用微信扫码' },
-              { type: 'wechat_h5', label: '微信 H5', ready: payProviders.wechat, hint: '手机浏览器拉起微信' },
-              { type: 'ezfpy_alipay', label: '易支付备用', ready: payProviders.ezfpy, hint: '仅作备用通道' },
+              { type: 'alipay', label: '支付宝', ready: payProviders.alipay, hint: '推荐用于网页支付' },
+              { type: 'wechat_native', label: '微信扫码', ready: payProviders.wechat, hint: '电脑端扫码支付' },
+              { type: 'wechat_h5', label: '微信支付', ready: payProviders.wechat, hint: '手机端唤起支付' },
             ].map(item => <button key={item.type} disabled={!item.ready} onClick={() => setPayType(item.type as any)} className={`rounded-xl border px-3 py-2 text-left font-semibold ${payType === item.type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'} disabled:cursor-not-allowed disabled:opacity-45`}>
-              <span className="block">{item.label} {item.ready ? '✅' : '未配置'}</span><span className="text-[11px] font-normal text-slate-400">{item.hint}</span>
+              <span className="block">{item.label} {item.ready ? '✅' : '暂未开放'}</span><span className="text-[11px] font-normal text-slate-400">{item.hint}</span>
             </button>)}
           </div>
-          {!payProviders.alipay && !payProviders.wechat && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">官方支付尚未配置密钥。Vercel 配好支付宝或微信支付环境变量后，按钮会自动启用。</div>}
+          {!payProviders.alipay && !payProviders.wechat && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">支付服务正在开通中，请稍后再试。</div>}
           {wechatQr && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
             <div className="mb-2 text-sm font-bold text-emerald-800">微信支付二维码</div>
             <img src={wechatQr.qrDataUrl} alt="微信支付二维码" className="mx-auto h-48 w-48 rounded-xl bg-white p-2" />
@@ -625,7 +624,7 @@ export default function Home() {
               <span className="text-lg font-black text-brand-600">{payLoading === pack.id ? '创建中...' : pack.price}</span>
             </button>)}
           </div>
-          <p className="text-center text-xs text-slate-400">优先使用官方支付宝/微信支付；支付成功后由官方异步通知到账，结果页可刷新查询。</p>
+          <p className="text-center text-xs text-slate-400">支付成功后积分或 PRO 权益会自动到账；如未及时更新，可在支付结果页刷新。</p>
           <button onClick={() => setShowPay(false)} className="w-full text-sm text-slate-400">{tr.later}</button>
         </div>
       </Modal>
