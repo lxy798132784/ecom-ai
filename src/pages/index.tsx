@@ -602,11 +602,12 @@ export default function Home() {
               { type: 'alipay', label: '支付宝', ready: payProviders.alipay, hint: '推荐用于网页支付' },
               { type: 'wechat_native', label: '微信扫码', ready: payProviders.wechat, hint: '电脑端扫码支付' },
               { type: 'wechat_h5', label: '微信支付', ready: payProviders.wechat, hint: '手机端唤起支付' },
+              { type: 'ezfpy_alipay', label: '备用支付', ready: payProviders.ezfpy, hint: '主通道不可用时使用' },
             ].map(item => <button key={item.type} disabled={!item.ready} onClick={() => setPayType(item.type as any)} className={`rounded-xl border px-3 py-2 text-left font-semibold ${payType === item.type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'} disabled:cursor-not-allowed disabled:opacity-45`}>
               <span className="block">{item.label} {item.ready ? '✅' : '暂未开放'}</span><span className="text-[11px] font-normal text-slate-400">{item.hint}</span>
             </button>)}
           </div>
-          {!payProviders.alipay && !payProviders.wechat && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">支付服务正在开通中，请稍后再试。</div>}
+          {!payProviders.alipay && !payProviders.wechat && !payProviders.ezfpy && <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-700">支付服务正在开通中，请稍后再试。</div>}
           {wechatQr && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
             <div className="mb-2 text-sm font-bold text-emerald-800">微信支付二维码</div>
             <img src={wechatQr.qrDataUrl} alt="微信支付二维码" className="mx-auto h-48 w-48 rounded-xl bg-white p-2" />
