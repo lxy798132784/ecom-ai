@@ -10,7 +10,7 @@ export const QUALITY_MULTIPLIER: Record<ImageQuality, number> = {
 
 export const BASE_IMAGE_POINTS = 1;
 export const FREE_MONTHLY_POINTS = 10;
-export const PRO_MONTHLY_POINTS = 2000;
+export const PRO_MONTHLY_POINTS = 2500;
 
 export function normalizeQuality(input: any): ImageQuality {
   return input === 'low' || input === 'medium' || input === 'high' ? input : 'auto';

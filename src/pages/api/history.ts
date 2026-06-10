@@ -4,9 +4,10 @@ export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
 import { normalizeEmail, findUserByEmail } from '../../lib/users';
 import { addGalleryImage, getGalleryItems, itemUrls, removeGalleryImage } from '../../lib/galleryStore';
+import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS } from '../../lib/pricing';
 
-const FREE_LIMIT = 10;
-const PRO_LIMIT = 2000;
+const FREE_LIMIT = FREE_MONTHLY_POINTS;
+const PRO_LIMIT = PRO_MONTHLY_POINTS;
 
 function currentMonth() { return new Date().toISOString().slice(0, 7); }
 function usageKey(email: string, bucket: 'free' | 'pro', month = currentMonth()) { return `usage:${bucket}:${email}:${month}`; }

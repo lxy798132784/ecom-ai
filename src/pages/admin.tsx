@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import { t, Lang } from '../lib/i18n';
+import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS } from '../lib/pricing';
 
 type AdminUser = {
   id?: string;
@@ -333,7 +334,7 @@ export default function AdminPage() {
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm md:rounded-2xl md:p-4">
             <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">总积分</p>
-            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))), 0)}</p>
+            <p className="mt-1 text-xl font-black tracking-tight text-slate-950 md:mt-2 md:text-3xl">{users.reduce((n, u) => n + Number(u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? PRO_MONTHLY_POINTS : FREE_MONTHLY_POINTS) - Number(u.usage || 0)) + Number(u.credits || 0))), 0)}</p>
           </div>
         </section>
 
@@ -413,7 +414,7 @@ export default function AdminPage() {
                 <label className="space-y-1"><span className="text-slate-500">{tr.newPassword}</span><input type="password" value={u.newPassword || ''} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, newPassword: e.target.value } : x))} className="w-full rounded-lg border border-slate-200 px-2 py-2" /></label>
               </div>
               <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
-                <div>{tr.creditBalance}: <b>{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))}</b></div>
+                <div>{tr.creditBalance}: <b>{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? PRO_MONTHLY_POINTS : FREE_MONTHLY_POINTS) - Number(u.usage || 0)) + Number(u.credits || 0))}</b></div>
                 <div>{tr.createdAt}: <b className="break-all">{u.createdAt || '-'}</b></div>
                 <div>{tr.historyCount.replace('{count}', String(u.history?.length || 0))}</div>
                 <div>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}</div>
@@ -464,7 +465,7 @@ export default function AdminPage() {
                     </td>
                     <td className="p-3"><select value={u.plan || 'free'} onChange={e => updateUser(u, { plan: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1"><option value="free">free</option><option value="pro">pro</option></select></td>
                     <td className="p-3"><input type="number" min={0} value={u.usage || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, usage: Number(e.target.value), ...(x.plan === 'pro' ? { proUsage: Number(e.target.value) } : { freeUsage: Number(e.target.value) }) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /><div className="text-[10px] text-slate-400 mt-1">free {u.freeUsage || 0} {tr.times} · pro {u.proUsage || 0} {tr.times}</div></td>
-                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? 2000 : 10) - Number(u.usage || 0)) + Number(u.credits || 0))}</span></td>
+                    <td className="p-3"><span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{u.totalPoints ?? (Math.max(0, (u.plan === 'pro' ? PRO_MONTHLY_POINTS : FREE_MONTHLY_POINTS) - Number(u.usage || 0)) + Number(u.credits || 0))}</span></td>
                     <td className="p-3"><input type="number" min={0} value={u.credits || 0} onChange={e => setUsers(prev => prev.map(x => x.email === u.email ? { ...x, credits: Number(e.target.value) } : x))} className="w-24 rounded-lg border border-slate-200 px-2 py-1" /></td>
                     <td className="p-3 text-xs text-slate-500">{tr.historyCount.replace('{count}', String(u.history?.length || 0))}<br/>{tr.favoritesCount.replace('{count}', String(u.favorites?.length || 0))}<br/>{tr.collectionsCount.replace('{count}', String(u.collections?.length || 0))}<br/>{tr.mediaCount.replace('{count}', String(u.mediaHistory?.length || 0))}</td>
                     <td className="p-3 text-xs text-slate-500">{u.createdAt || '-'}</td>

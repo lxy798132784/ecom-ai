@@ -240,6 +240,8 @@ export default function Home() {
   const [credits, setCredits] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
   const [accountPlan, setAccountPlan] = useState<'free'|'pro'>('free');
+  const [payType, setPayType] = useState<'alipay'|'wxpay'|'qqpay'>('alipay');
+  const [payLoading, setPayLoading] = useState('');
 
   const usageLeft = Math.max(0, usageLimit - usageCount);
   const displayPoints = totalPoints || (usageLeft + credits);
@@ -313,6 +315,24 @@ export default function Home() {
   const clearReferences = () => { setReferences([]); setActiveRef(''); setSelectedRefUrls([]); };
   const applyPromptTemplate = (text: string) => { if (mode === 'text' || mode === 'agent') setPrompt(text); else setCustomPrompt(text); };
 
+  const startPayment = async (packId: string) => {
+    if (!loggedIn) { setShowPay(false); setShowLogin(true); return; }
+    setPayLoading(packId); setError('');
+    try {
+      const res = await fetch('/api/pay/ezfpy/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId, type: payType }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || '创建支付订单失败');
+      window.location.href = data.payUrl;
+    } catch (e: any) {
+      setError(e.message || '创建支付订单失败');
+    } finally {
+      setPayLoading('');
+    }
+  };
+
   const submit = async () => {
     if (!loggedIn) { setShowLogin(true); return; }
     if (mode !== 'text' && mode !== 'agent' && !primaryReference) { setError(tr.referenceRequired); return; }
@@ -383,7 +403,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2 text-xs">
             <button onClick={toggleLang} className="rounded-lg border border-white/10 px-2 py-1">{lang === 'zh' ? 'EN' : '中'}</button>
-            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {displayPoints} {tr.times}</span><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => { setShowRegister(true); setCaptchaToken(''); }} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
+            {loggedIn ? <><span className="hidden text-slate-400 sm:inline">{session?.user?.email}</span><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">{accountPlan.toUpperCase()} · {displayPoints} {tr.times}</span><button onClick={() => setShowPay(true)} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">购买积分 / PRO</button><button onClick={() => signOut()}>{tr.logout}</button></> : <><button onClick={() => setShowLogin(true)} className="text-brand-300">{tr.login}</button><button onClick={() => { setShowRegister(true); setCaptchaToken(''); }} className="rounded-full bg-brand-600 px-3 py-1.5 text-white">{tr.register}</button></>}
           </div>
         </div>
       </header>
@@ -532,7 +552,27 @@ export default function Home() {
       <Modal show={showLogin} title={'🔐 ' + tr.loginTitle} onClose={() => setShowLogin(false)}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}{verificationEmail && <button onClick={resendVerification} className="mt-2 block text-xs font-semibold text-red-700 underline">{tr.resendVerification}</button>}</div>}<input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.password} type="password" onKeyDown={e => e.key === 'Enter' && doLogin()} className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><button onClick={doLogin} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.login}</button><button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); setCaptchaToken(''); }} className="mt-2 w-full text-center text-xs text-slate-400 hover:text-brand-600">{tr.forgotPassword}</button><p className="mt-3 text-center text-sm text-slate-400">{tr.noAccount} <button onClick={() => { setShowLogin(false); setShowRegister(true); setAuthError(''); setCaptchaToken(''); }} className="text-brand-600">{tr.register}</button></p></Modal>
       <Modal show={showRegister} title={'✨ ' + tr.registerTitle} onClose={() => { setShowRegister(false); setCaptchaToken(''); }}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<input value={authName} onChange={e => setAuthName(e.target.value)} placeholder={tr.name} className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.passwordHint} type="password" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button></Modal>
       <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => { setShowForgot(false); setCaptchaToken(''); }}>{forgotSent ? <div className="text-center"><p className="mb-4 text-5xl">📧</p><p className="mb-2 font-medium text-slate-700">{tr.emailSent}</p><p className="mb-4 text-sm text-slate-500">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p><button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.backToLogin}</button></div> : <>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<p className="mb-4 text-sm text-slate-500">{tr.forgotDesc}</p><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doForgot} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.sendResetLink}</button></>}</Modal>
-      <Modal show={showPay} title={'🚀 ' + tr.upgradeTitle} onClose={() => setShowPay(false)}><p className="mb-4 text-center text-sm text-slate-500">{usageLeft <= 0 ? tr.limitReached : tr.freeLeftDesc.replace('{left}', String(usageLeft))}</p><a href={process.env.NEXT_PUBLIC_STRIPE_LINK || '#'} target="_blank" rel="noopener" className="block w-full rounded-xl bg-brand-600 py-2.5 text-center font-semibold text-white">💳 {tr.upgradeBtn}</a><button onClick={() => setShowPay(false)} className="mt-2 w-full text-sm text-slate-400">{tr.later}</button></Modal>
+      <Modal show={showPay} title={'🚀 购买积分 / 升级 PRO'} onClose={() => setShowPay(false)}>
+        <div className="space-y-4">
+          <p className="text-center text-sm text-slate-500">当前总积分：<b>{displayPoints}</b>，本次预计消耗：<b>{pointsCost}</b> 积分</p>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            {[['alipay','支付宝'],['wxpay','微信支付'],['qqpay','QQ钱包']].map(([type,label]) => <button key={type} onClick={() => setPayType(type as any)} className={`rounded-xl border px-3 py-2 font-semibold ${payType === type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>{label}</button>)}
+          </div>
+          <div className="grid gap-3">
+            {[
+              { id: 'credits_50', title: '50 积分包', desc: '适合轻量试稿', price: '¥2' },
+              { id: 'credits_200', title: '200 积分包', desc: '适合持续创作', price: '¥7' },
+              { id: 'credits_500', title: '500 积分包', desc: '高性价比积分包', price: '¥18' },
+              { id: 'pro_monthly', title: '升级 PRO', desc: '每月 2500 积分', price: '¥75/月' },
+            ].map(pack => <button key={pack.id} disabled={Boolean(payLoading)} onClick={() => startPayment(pack.id)} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:border-brand-400 disabled:opacity-60">
+              <span><span className="block font-bold text-slate-900">{pack.title}</span><span className="text-xs text-slate-500">{pack.desc}</span></span>
+              <span className="text-lg font-black text-brand-600">{payLoading === pack.id ? '创建中...' : pack.price}</span>
+            </button>)}
+          </div>
+          <p className="text-center text-xs text-slate-400">支付由易支付跳转处理，支付成功后自动到账；如果未及时到账，可在支付结果页刷新。</p>
+          <button onClick={() => setShowPay(false)} className="w-full text-sm text-slate-400">{tr.later}</button>
+        </div>
+      </Modal>
     </main>
   </>;
 }

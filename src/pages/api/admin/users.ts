@@ -3,6 +3,7 @@ import { kv } from '@vercel/kv';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { requireAdmin } from '../../../lib/adminAuth';
+import { FREE_MONTHLY_POINTS, PRO_MONTHLY_POINTS } from '../../../lib/pricing';
 import { normalizeEmail } from '../../../lib/users';
 import { canonicalImageId } from '../../../lib/imageStore';
 import { getCollections, saveCollections } from '../../../lib/collectionsStore';
@@ -170,7 +171,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         freeUsage: freeUsage || 0,
         proUsage: proUsage || 0,
         credits: credits || 0,
-        totalPoints: Math.max(0, ((user.plan === 'pro' ? 2000 : 10) - (user.plan === 'pro' ? (proUsage || 0) : (freeUsage || 0)))) + (credits || 0),
+        totalPoints: Math.max(0, ((user.plan === 'pro' ? PRO_MONTHLY_POINTS : FREE_MONTHLY_POINTS) - (user.plan === 'pro' ? (proUsage || 0) : (freeUsage || 0)))) + (credits || 0),
         history: filterDeletedImages(history || [], deletedHistory),
         favorites: filterDeletedImages(favorites || [], deletedFav),
         historyCountPreview: filterDeletedImages(history || [], deletedHistory).length,
