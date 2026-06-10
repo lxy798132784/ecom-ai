@@ -232,6 +232,9 @@ export default function Home() {
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
   const [captchaToken, setCaptchaToken] = useState('');
+  const [emailVerifyCode, setEmailVerifyCode] = useState('');
+  const [emailCodeCountdown, setEmailCodeCountdown] = useState(0);
+  const [sendingEmailCode, setSendingEmailCode] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -267,6 +270,11 @@ export default function Home() {
     if (f.items) setFavoriteItems(f.items); else if (f.favorites) setFavoriteItems(uniqueImages(f.favorites).map((url: string) => ({ url })));
   }, [loggedIn]);
   useEffect(() => { refreshGallery(); }, [refreshGallery]);
+  useEffect(() => {
+    if (emailCodeCountdown <= 0) return;
+    const timer = window.setTimeout(() => setEmailCodeCountdown(v => Math.max(0, v - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [emailCodeCountdown]);
 
   const selected = selectedResults;
   const toggleSelect = (url: string) => setSelectedResults(prev => { const next = new Set(prev); next.has(url) ? next.delete(url) : next.add(url); return next; });
@@ -373,8 +381,25 @@ export default function Home() {
   const addToCollection = (url: string) => { if (!collections.length) { const next = [{ id: newId(), name: tr.favorites, urls: [url], createdAt: Date.now(), updatedAt: Date.now() }]; setCollections(next); writeLocalJson(COLLECTION_KEY, next); return; } const name = window.prompt(`${tr.addToCollectionPrompt}: ${collections.map(c => c.name).join(', ')}`); const col = collections.find(c => c.name === name || c.id === name) || collections[0]; const next = collections.map(c => c.id === col.id ? { ...c, urls: uniqueImages([url, ...c.urls]), updatedAt: Date.now() } : c); setCollections(next); writeLocalJson(COLLECTION_KEY, next); fetch('/api/collections', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ items: next }) }).catch(() => {}); };
   const exportWorkspace = () => { const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), references, activeRef, selectedRefUrls, tasks, collections, agentMessages, historyItems, favoriteItems }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'image-studio-workspace.json'; a.click(); URL.revokeObjectURL(url); };
   const importWorkspace = async (file: File) => { const payload = JSON.parse(await file.text()); if (Array.isArray(payload.references)) setReferences(payload.references.slice(0, 12)); if (typeof payload.activeRef === 'string') setActiveRef(payload.activeRef); if (Array.isArray(payload.selectedRefUrls)) setSelectedRefUrls(payload.selectedRefUrls.slice(0, 12)); if (Array.isArray(payload.tasks)) setTasks(payload.tasks.slice(0, 50)); if (Array.isArray(payload.collections)) { setCollections(payload.collections); writeLocalJson(COLLECTION_KEY, payload.collections); } if (Array.isArray(payload.agentMessages)) { setAgentMessages(payload.agentMessages); writeLocalJson(AGENT_KEY, payload.agentMessages); } };
+  const sendRegisterEmailCode = async () => {
+    setAuthError('');
+    if (!authEmail.trim()) { setAuthError(tr.pleaseFill); return; }
+    setSendingEmailCode(true);
+    try {
+      const res = await fetch('/api/auth/send-verify-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: authEmail, captchaToken }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '验证码发送失败');
+      setEmailCodeCountdown(Number(data.countdown || 60));
+      setCaptchaToken('');
+      setAuthError(data.message || '验证码已发送，请查看邮箱');
+    } catch (e: any) {
+      setAuthError(e.message || '验证码发送失败');
+    } finally {
+      setSendingEmailCode(false);
+    }
+  };
   const doLogin = async () => { setAuthError(''); const res = await signIn('credentials', { email: authEmail, password: authPassword, redirect: false }); if (res?.error) { setAuthError(res.error === 'EMAIL_NOT_VERIFIED' ? tr.emailNotVerified : tr.authError); if (res.error === 'EMAIL_NOT_VERIFIED') setVerificationEmail(authEmail); return; } setShowLogin(false); };
-  const doRegister = async () => { setAuthError(''); if (!authEmail.trim() || !authPassword.trim()) { setAuthError(tr.pleaseFill); return; } const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: authEmail, password: authPassword, name: authName, captchaToken }) }); const data = await res.json(); if (!res.ok) { setAuthError(data.error); return; } setVerificationEmail(authEmail); setAuthError(tr.registrationVerifySent); setShowRegister(false); setShowLogin(true); setCaptchaToken(''); };
+  const doRegister = async () => { setAuthError(''); if (!authEmail.trim() || !authPassword.trim() || !emailVerifyCode.trim()) { setAuthError(tr.pleaseFill); return; } const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: authEmail, password: authPassword, name: authName, verifyCode: emailVerifyCode }) }); const data = await res.json(); if (!res.ok) { setAuthError(data.error); return; } setAuthError(data.message || tr.regSuccess); setShowRegister(false); setShowLogin(true); setCaptchaToken(''); setEmailVerifyCode(''); setEmailCodeCountdown(0); };
   const doForgot = async () => { if (!forgotEmail.trim()) { setAuthError(tr.pleaseFill); return; } const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: forgotEmail, captchaToken }) }); if (!res.ok) { const d = await res.json(); setAuthError(d.error); return; } setCaptchaToken(''); setForgotSent(true); };
   const resendVerification = async () => { const email = (verificationEmail || authEmail).trim(); if (!email) { setAuthError(tr.pleaseFill); return; } const res = await fetch('/api/auth/resend-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, captchaToken }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { setAuthError(data.error || tr.resendVerificationFailed); return; } setCaptchaToken(''); setAuthError(tr.verificationResent); };
 
@@ -550,7 +575,19 @@ export default function Home() {
       </Modal>
       <Modal show={Boolean(detailItem)} title={tr.imageDetails} onClose={() => setDetailItem(null)}>{detailItem && <div className="space-y-3 text-sm"><img src={detailItem.url} className="max-h-64 w-full rounded-xl object-contain bg-slate-100" alt="" /><div className="grid grid-cols-2 gap-2 text-xs"><div><b>{tr.customPrompt}</b><p className="break-words text-slate-500">{detailItem.prompt || '-'}</p></div><div><b>{tr.actions}</b><p className="text-slate-500">{detailItem.action || '-'}</p></div><div><b>{tr.resolution}</b><p className="text-slate-500">{detailItem.size || '-'}</p></div><div><b>{tr.outputFormat}</b><p className="text-slate-500">{detailItem.outputFormat || '-'}</p></div><div><b>{tr.referencePanel}</b><p className="text-slate-500">{detailItem.referenceCount || 0}</p></div><div><b>{tr.createdAt}</b><p className="text-slate-500">{detailItem.createdAt || '-'}</p></div></div><button onClick={() => navigator.clipboard?.writeText(detailItem.prompt || detailItem.url)} className="w-full rounded-xl bg-brand-600 py-2 text-white">{tr.copy}</button></div>}</Modal>
       <Modal show={showLogin} title={'🔐 ' + tr.loginTitle} onClose={() => setShowLogin(false)}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}{verificationEmail && <button onClick={resendVerification} className="mt-2 block text-xs font-semibold text-red-700 underline">{tr.resendVerification}</button>}</div>}<input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.password} type="password" onKeyDown={e => e.key === 'Enter' && doLogin()} className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><button onClick={doLogin} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.login}</button><button onClick={() => { setShowLogin(false); setShowForgot(true); setForgotEmail(authEmail); setForgotSent(false); setAuthError(''); setCaptchaToken(''); }} className="mt-2 w-full text-center text-xs text-slate-400 hover:text-brand-600">{tr.forgotPassword}</button><p className="mt-3 text-center text-sm text-slate-400">{tr.noAccount} <button onClick={() => { setShowLogin(false); setShowRegister(true); setAuthError(''); setCaptchaToken(''); }} className="text-brand-600">{tr.register}</button></p></Modal>
-      <Modal show={showRegister} title={'✨ ' + tr.registerTitle} onClose={() => { setShowRegister(false); setCaptchaToken(''); }}>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<input value={authName} onChange={e => setAuthName(e.target.value)} placeholder={tr.name} className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.passwordHint} type="password" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button></Modal>
+      <Modal show={showRegister} title={'✨ ' + tr.registerTitle} onClose={() => { setShowRegister(false); setCaptchaToken(''); }}>
+        {authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}
+        <input value={authName} onChange={e => setAuthName(e.target.value)} placeholder={tr.name} className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
+        <input value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={tr.email} type="email" className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
+        <div className="mb-3 grid grid-cols-[1fr_auto] gap-2">
+          <input value={emailVerifyCode} onChange={e => setEmailVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="邮箱验证码 / 6-digit code" inputMode="numeric" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
+          <button type="button" disabled={sendingEmailCode || emailCodeCountdown > 0} onClick={sendRegisterEmailCode} className="whitespace-nowrap rounded-xl border border-brand-200 px-3 py-2 text-sm font-semibold text-brand-700 disabled:opacity-50">{sendingEmailCode ? '发送中...' : emailCodeCountdown > 0 ? `${emailCodeCountdown}s` : '发送验证码'}</button>
+        </div>
+        <input value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder={tr.passwordHint} type="password" onKeyDown={e => e.key === 'Enter' && doRegister()} className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
+        <TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} />
+        <p className="mb-3 text-xs leading-5 text-slate-500">先完成人机验证并发送邮箱验证码；注册提交时只校验验证码，避免重复使用 Turnstile token。</p>
+        <button onClick={doRegister} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.register}</button>
+      </Modal>
       <Modal show={showForgot} title={'🔑 ' + tr.forgotTitle} onClose={() => { setShowForgot(false); setCaptchaToken(''); }}>{forgotSent ? <div className="text-center"><p className="mb-4 text-5xl">📧</p><p className="mb-2 font-medium text-slate-700">{tr.emailSent}</p><p className="mb-4 text-sm text-slate-500">{tr.resetEmailSent.replace('{email}', forgotEmail)}</p><button onClick={() => { setShowForgot(false); setShowLogin(true); setForgotSent(false); }} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.backToLogin}</button></div> : <>{authError && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">{authError}</div>}<p className="mb-4 text-sm text-slate-500">{tr.forgotDesc}</p><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder={tr.registeredEmail} type="email" className="mb-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" /><TurnstileBox token={captchaToken} setToken={setCaptchaToken} tr={tr} /><button onClick={doForgot} className="w-full rounded-xl bg-brand-600 py-3 font-semibold text-white">{tr.sendResetLink}</button></>}</Modal>
       <Modal show={showPay} title={'🚀 购买积分 / 升级 PRO'} onClose={() => setShowPay(false)}>
         <div className="space-y-4">

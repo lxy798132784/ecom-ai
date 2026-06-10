@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:email-code": "node scripts/test-email-code.cjs",
     "check:i18n": "node scripts/check-i18n-hardcoded.cjs"
   },
   "dependencies": {

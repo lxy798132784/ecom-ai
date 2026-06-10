@@ -86,3 +86,21 @@ export async function createPasswordReset(email: string) {
   await kv.set(`reset:${token}`, email, { ex: 1800 });
   return { token, url: `${baseUrl()}/reset?token=${token}` };
 }
+
+export async function sendVerificationCodeEmail(email: string, code: string, expiresInMinutes = 15, name?: string) {
+  const result = await sendMail({
+    to: email,
+    subject: `${appName} 邮箱验证码 / Email verification code`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#111827">
+      <h2 style="margin:0 0 12px">${appName} 邮箱验证码</h2>
+      <p>Hello ${name || email},</p>
+      <p>你的注册验证码是：</p>
+      <div style="font-size:34px;font-weight:800;letter-spacing:8px;background:#f3f4f6;border-radius:14px;padding:18px 24px;text-align:center;margin:20px 0;color:#111827">${code}</div>
+      <p style="font-size:14px;color:#4b5563;line-height:1.7">验证码 ${expiresInMinutes} 分钟内有效。为了安全，请不要把验证码转发给任何人。</p>
+      <p style="font-size:13px;color:#6b7280;line-height:1.6">Your verification code is <b>${code}</b>. It expires in ${expiresInMinutes} minutes.</p>
+      <p style="font-size:12px;color:#9ca3af">If you did not request this code, you can ignore this email.</p>
+    </div>`,
+  });
+  if (result.skipped) throw new Error('Email delivery is not configured. Please set SMTP_HOST/SMTP_USER/SMTP_PASS or RESEND_API_KEY.');
+  return { provider: result.provider };
+}
