@@ -27,7 +27,9 @@ type AdminUser = {
   mediaHistory?: { id: string; kind: string; url: string; prompt?: string; createdAt?: string }[];
 };
 
-type AdminImageProvider = {
+type MediaKind = 'image' | 'video' | 'audio' | 'voice-clone';
+
+type AdminProvider = {
   id: string;
   name: string;
   baseURL: string;
@@ -81,8 +83,37 @@ export default function AdminPage() {
   const [lang, setLangState] = useState<Lang>('zh');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', name: '', password: '', plan: 'free', credits: 0, emailVerified: true });
-  const [providers, setProviders] = useState<AdminImageProvider[]>([]);
-  const [newProvider, setNewProvider] = useState({ name: '', baseURL: '', model: 'gpt-image-2', apiKey: '', priority: 100, enabled: true });
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
+  const [currentKind, setCurrentKind] = useState<MediaKind>('image');
+  const [newProvider, setNewProvider] = useState({ name: '', baseURL: '', model: '', apiKey: '', priority: 100, enabled: true });
+  const [availableModels, setAvailableModels] = useState<{id: string; ownedBy?: string}[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchModelError, setFetchModelError] = useState('');
+
+  const KIND_LABELS: Record<MediaKind, string> = {
+    image: '生图模型',
+    video: '生视频模型',
+    audio: '生语音模型',
+    'voice-clone': '音色克隆模型',
+  };
+  const KIND_ENV_HINTS: Record<MediaKind, string> = {
+    image: 'Vercel 环境变量 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_IMAGE_MODEL',
+    video: '环境变量 VIDEO_API_URL / VIDEO_API_KEY / VIDEO_MODEL',
+    audio: '环境变量 AUDIO_API_URL / AUDIO_API_KEY / AUDIO_MODEL',
+    'voice-clone': '环境变量 VOICE_CLONE_API_URL / VOICE_CLONE_API_KEY / VOICE_CLONE_MODEL',
+  };
+  const KIND_PLACEHOLDERS: Record<MediaKind, { name: string; url: string; model: string }> = {
+    image: { name: '名称，如 SafeAPI 主线路', url: 'Base URL，如 https://safeapi.vip/v1', model: '模型名，如 gpt-image-2' },
+    video: { name: '名称，如 Runway 主线路', url: 'Base URL，如 https://api.runwayml.com/v1', model: '模型名，如 gen3' },
+    audio: { name: '名称，如 ElevenLabs 主线路', url: 'Base URL，如 https://api.elevenlabs.io/v1', model: '模型名，如 1-1' },
+    'voice-clone': { name: '名称，如 CosyVoice 主线路', url: 'Base URL，如 https://api.example.com/v1', model: '模型名，如 cosyvoice-v1' },
+  };
+  const KIND_DEFAULT_MODEL: Record<MediaKind, string> = {
+    image: 'gpt-image-2',
+    video: 'gen-3.5-turbo',
+    audio: '1-1',
+    'voice-clone': 'cosyvoice-v1',
+  };
   const tr = t[lang];
   const toggleLang = () => { const next = lang === 'zh' ? 'en' : 'zh'; setLangState(next); saveLang(next); };
 
@@ -100,15 +131,22 @@ export default function AdminPage() {
     if (data.loggedIn) { await loadUsers(); await loadProviders(); }
   };
 
-  const loadProviders = async () => {
+  const loadProviders = async (kind?: MediaKind) => {
+    const k = kind || currentKind;
     try {
-      const res = await fetch('/api/admin/image-providers');
+      const res = await fetch(`/api/admin/providers?kind=${k}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tr.failed);
       setProviders(data.providers || []);
     } catch (e: any) {
       setError(e.message || tr.failed);
     }
+  };
+
+  const switchKind = (kind: MediaKind) => {
+    setCurrentKind(kind);
+    setNewProvider({ name: '', baseURL: '', model: KIND_DEFAULT_MODEL[kind], apiKey: '', priority: 100, enabled: true });
+    loadProviders(kind);
   };
 
   const loadUsers = async () => {
@@ -123,6 +161,30 @@ export default function AdminPage() {
     } finally { setLoading(false); }
   };
 
+  const fetchModels = async () => {
+    const { baseURL, apiKey } = newProvider;
+    if (!baseURL || !apiKey) {
+      setFetchModelError('请先填写 Base URL 和 API Key');
+      return;
+    }
+    setFetchingModels(true);
+    setFetchModelError('');
+    setAvailableModels([]);
+    try {
+      const res = await fetch(`/api/admin/provider-models?url=${encodeURIComponent(baseURL)}&apiKey=${encodeURIComponent(apiKey)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '获取模型列表失败');
+      setAvailableModels(data.models || []);
+      if (data.models.length === 0) {
+        setFetchModelError('Provider 未返回任何模型，请检查 URL 和 Key 是否正确');
+      }
+    } catch (e: any) {
+      setFetchModelError(e.message || '获取模型列表失败');
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
   useEffect(() => { setLangState(getLang()); loadSession().catch(() => {}); }, []);
   useEffect(() => { if (loggedIn) loadUsers().catch(() => {}); }, [month]);
 
@@ -135,7 +197,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error || tr.authError);
       setLoggedIn(true); setAdminEmail(data.email || email); setPassword('');
       await loadUsers();
-      await loadProviders();
+      await loadProviders('image');
     } catch (e: any) { setError(e.message || tr.authError); }
     setLoading(false);
   };
@@ -184,11 +246,12 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
-  const saveProvider = async (provider?: AdminImageProvider) => {
+  const saveProvider = async (provider?: AdminProvider) => {
     const payload = provider || newProvider;
-    setMessage('保存生图模型配置中...'); setError('');
+    const label = KIND_LABELS[currentKind];
+    setMessage(`保存${label}配置中...`); setError('');
     try {
-      const res = await fetch('/api/admin/image-providers', {
+      const res = await fetch(`/api/admin/providers?kind=${currentKind}`, {
         method: provider?.id ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -196,21 +259,22 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tr.failed);
       setProviders(data.providers || []);
-      if (!provider?.id) setNewProvider({ name: '', baseURL: '', model: 'gpt-image-2', apiKey: '', priority: 100, enabled: true });
-      setMessage('生图模型配置已保存');
+      if (!provider?.id) setNewProvider({ name: '', baseURL: '', model: KIND_DEFAULT_MODEL[currentKind], apiKey: '', priority: 100, enabled: true });
+      setMessage(`${label}配置已保存`);
     } catch (e: any) {
       setError(e.message || tr.failed);
     }
   };
 
-  const deleteProvider = async (provider: AdminImageProvider) => {
-    if (!confirm(`删除生图模型配置：${provider.name || provider.baseURL}？`)) return;
+  const deleteProvider = async (provider: AdminProvider) => {
+    const label = KIND_LABELS[currentKind];
+    if (!confirm(`删除${label}配置：${provider.name || provider.baseURL}？`)) return;
     try {
-      const res = await fetch('/api/admin/image-providers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: provider.id }) });
+      const res = await fetch(`/api/admin/providers?kind=${currentKind}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: provider.id }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tr.failed);
       setProviders(data.providers || []);
-      setMessage('生图模型配置已删除');
+      setMessage(`${label}配置已删除`);
     } catch (e: any) { setError(e.message || tr.failed); }
   };
 
@@ -338,21 +402,54 @@ export default function AdminPage() {
           </div>
         </section>
 
+        {/* ── Provider Config Section ── */}
         <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
-          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">生图模型配置</h2>
-              <p className="text-sm text-slate-500">按优先级从小到大调用；当前配置失败会自动回落到下一条，最后回落到 Vercel 环境变量 OPENAI_*。</p>
+              <h2 className="text-lg font-bold text-slate-900">模型配置管理</h2>
+              <p className="text-sm text-slate-500 mt-1">按优先级从小到大调用；配置失败自动回落到下一条，最后回落到环境变量。</p>
             </div>
-            <button onClick={loadProviders} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">刷新模型</button>
+            <button onClick={() => loadProviders(currentKind)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 whitespace-nowrap">刷新配置</button>
           </div>
-          <div className="grid gap-2 md:grid-cols-6">
-            <input value={newProvider.name} onChange={e => setNewProvider(v => ({ ...v, name: e.target.value }))} placeholder="名称，如 SafeAPI 主线路" className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-1" />
-            <input value={newProvider.baseURL} onChange={e => setNewProvider(v => ({ ...v, baseURL: e.target.value }))} placeholder="Base URL，如 https://safeapi.vip/v1" className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-2" />
-            <input value={newProvider.model} onChange={e => setNewProvider(v => ({ ...v, model: e.target.value }))} placeholder="模型名，如 gpt-image-2" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <input type="password" value={newProvider.apiKey} onChange={e => setNewProvider(v => ({ ...v, apiKey: e.target.value }))} placeholder="API Key" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <button type="button" onClick={() => saveProvider()} className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white">添加模型</button>
+          {/* ── Tabs ── */}
+          <div className="flex gap-1 mb-4 flex-wrap">
+            {(['image', 'video', 'audio', 'voice-clone'] as MediaKind[]).map(k => {
+              const active = k === currentKind;
+              return (
+                <button key={k} onClick={() => switchKind(k)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${active ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {KIND_LABELS[k]}
+                </button>
+              );
+            })}
           </div>
+          {/* ── Add Form ── */}
+          <div className="space-y-2">
+            <div className="grid gap-2 md:grid-cols-6">
+              <input value={newProvider.name} onChange={e => setNewProvider(v => ({ ...v, name: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].name} className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-1" />
+              <input value={newProvider.baseURL} onChange={e => setNewProvider(v => ({ ...v, baseURL: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].url} className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-2" />
+              <input type="password" value={newProvider.apiKey} onChange={e => setNewProvider(v => ({ ...v, apiKey: e.target.value }))} placeholder="API Key" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <button type="button" onClick={fetchModels} disabled={fetchingModels || !newProvider.baseURL || !newProvider.apiKey} className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white whitespace-nowrap hover:bg-indigo-700 disabled:opacity-50">{fetchingModels ? '获取中...' : '获取模型列表'}</button>
+              <button type="button" onClick={() => saveProvider()} className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white whitespace-nowrap">{KIND_LABELS[currentKind].replace('模型', '')}模型</button>
+            </div>
+            {/* Available models dropdown */}
+            {availableModels.length > 0 && (
+              <div className="flex gap-2 items-center flex-wrap">
+                <span className="text-xs text-slate-500">从 Provider 获取到 {availableModels.length} 个模型，选择使用：</span>
+                <select
+                  value={newProvider.model}
+                  onChange={e => setNewProvider(v => ({ ...v, model: e.target.value }))}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm flex-1 min-w-48"
+                >
+                  <option value="">-- 手动输入模型名或从列表选择 --</option>
+                  {availableModels.map(m => (
+                    <option key={m.id} value={m.id}>{m.id} {m.ownedBy ? `(${m.ownedBy})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {fetchModelError && <div className="text-xs text-red-600">{fetchModelError}</div>}
+          </div>
+          {/* ── Provider List ── */}
           <div className="mt-3 space-y-2">
             {providers.map(p => <div key={p.id} className="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs md:grid-cols-12 md:items-center">
               <input value={p.name} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, name: e.target.value } : x))} className="rounded-lg border border-slate-200 px-2 py-2 md:col-span-2" />
@@ -363,7 +460,7 @@ export default function AdminPage() {
               <label className="flex items-center gap-1"><input type="checkbox" checked={p.enabled !== false} onChange={e => setProviders(list => list.map(x => x.id === p.id ? { ...x, enabled: e.target.checked } : x))} />启用</label>
               <div className="flex gap-1"><button onClick={() => saveProvider(p)} className="rounded-lg bg-brand-600 px-2 py-2 font-semibold text-white">保存</button><button onClick={() => deleteProvider(p)} className="rounded-lg bg-red-50 px-2 py-2 font-semibold text-red-600">删</button></div>
             </div>)}
-            {!providers.length && <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">暂无后台模型配置。系统仍会使用 Vercel 环境变量 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_IMAGE_MODEL。</div>}
+            {!providers.length && <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">暂无{KIND_LABELS[currentKind]}配置。系统仍会使用 {KIND_ENV_HINTS[currentKind]}。</div>}
           </div>
         </section>
 

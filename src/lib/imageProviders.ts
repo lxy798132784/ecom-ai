@@ -55,7 +55,11 @@ function maskKey(apiKey: string) {
 }
 
 function normalizeBaseURL(input: string) {
-  return String(input || '').trim().replace(/\/+$/, '');
+  const url = String(input || '').trim().replace(/\/+$/, '');
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new Error(`URL 必须以 http:// 或 https:// 开头，当前值：${input}`);
+  }
+  return url;
 }
 
 function envProvider(): RuntimeImageProvider | null {
