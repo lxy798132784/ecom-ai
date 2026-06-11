@@ -39,8 +39,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: '缺少参数: 需要 providerId+kind 或 url+apiKey' });
   }
 
+  let modelsPath = '/v1/models';
+  // Avoid double /v1 — if baseURL already ends with /v1, use /models directly
+  if (providerBaseURL.endsWith('/v1')) {
+    modelsPath = '/models';
+  }
+
   try {
-    const response = await fetch(`${providerBaseURL}/v1/models`, {
+    const response = await fetch(`${providerBaseURL}${modelsPath}`, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${providerApiKey}`,
