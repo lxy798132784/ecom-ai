@@ -156,18 +156,22 @@ export async function generateMedia(payload: MediaRequestPayload) {
   try {
     const r = await withProviderFallback(payload.kind, async (provider) => {
       const client = buildClient(provider);
-      const body = {
+      const body: Record<string, any> = {
         model: provider.model || envCfg.model,
-        prompt: payload.prompt,
-        text: payload.text || payload.prompt,
-        input_url: payload.inputUrl,
-        image: payload.inputUrl,
-        voice_sample: payload.voiceSample,
-        reference_audio: payload.voiceSample,
-        style: payload.style,
-        duration: payload.duration,
-        aspect_ratio: payload.aspectRatio,
+        messages: [{ role: 'user', content: payload.prompt }],
       };
+      // Add media-specific fields if present
+      if (payload.inputUrl) {
+        body.input_url = payload.inputUrl;
+        body.image = payload.inputUrl;
+      }
+      if (payload.voiceSample) {
+        body.voice_sample = payload.voiceSample;
+        body.reference_audio = payload.voiceSample;
+      }
+      if (payload.style) body.style = payload.style;
+      if (payload.duration !== undefined) body.duration = payload.duration;
+      if (payload.aspectRatio) body.aspect_ratio = payload.aspectRatio;
 
       // POST to /v1/chat/completions on the provider's base URL
       const baseURL = provider.baseURL.replace(/\/+$/, '');
