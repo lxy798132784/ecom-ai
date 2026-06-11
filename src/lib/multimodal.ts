@@ -180,27 +180,17 @@ export async function generateMedia(payload: MediaRequestPayload) {
         const taskId = createData.task_id || createData.id;
         if (!taskId) throw new Error('No task_id returned');
 
-        // Step 2: Poll status
-        for (let attempt = 0; attempt < 60; attempt++) {
-          if (attempt > 0) await sleep(5000);
-          const statusResp = await fetch(`${baseURL}/videos/${taskId}`, {
-            headers: client.headers,
-          });
-          const statusData: any = await parseResp(statusResp);
-
-          const status = statusData.status;
-          if (status === 'completed') {
-            const url = statusData.video_url || statusData.url || statusData.output_url || '';
-            if (!url) throw new Error('Completed but no video URL');
-            return { url, model: createData.model || '', raw: statusData };
-          }
-          if (status === 'failed') {
-            const err = statusData.error || 'Unknown error';
-            throw new Error(`Video generation failed: ${err}`);
-          }
-          // queued / processing / running
-        }
-        throw new Error('Video generation timed out after 5 minutes');
+        // Agnes video generation is asynchronous. On Vercel, keeping the API
+        // request open until the video finishes can hit serverless/browser
+        // timeouts and surface as "Failed to fetch". Return the queued task
+        // immediately; a later task-status endpoint can poll /v1/videos/{id}.
+        return {
+          url: '',
+          pending: true,
+          taskId,
+          model: createData.model || provider.model || '',
+          raw: createData,
+        };
       }
 
       // ── audio / voice-clone: synchronous ───────────────────────────────
@@ -262,7 +252,9 @@ export async function generateMedia(payload: MediaRequestPayload) {
 
   return {
     configured: true,
-    url: result.url,
+    url: result.url || '',
+    pending: Boolean(result.pending),
+    taskId: result.taskId || '',
     model: result.model || usedProvider?.model || '',
     provider: usedProvider?.name || '',
     raw: result.raw,

@@ -72,6 +72,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
   const [inputUrl, setInputUrl] = useState('');
   const [voiceSample, setVoiceSample] = useState('');
   const [result, setResult] = useState('');
+  const [pendingTask, setPendingTask] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mediaHistory, setMediaHistory] = useState<MediaHistoryItem[]>([]);
@@ -81,7 +82,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
   const generate = async () => {
     if (!loggedIn) { signIn(); return; }
     if (!prompt.trim()) { setError(tr.mediaPromptRequired); return; }
-    setLoading(true); setError(''); setResult('');
+    setLoading(true); setError(''); setResult(''); setPendingTask('');
     try {
       const res = await fetch('/api/media', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -89,6 +90,11 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) throw new Error(data.error || tr.mediaGenerateFailed);
+      if (data.pending && data.taskId) {
+        setPendingTask(data.taskId);
+        setLoading(false);
+        return;
+      }
       if (!data.url) throw new Error(tr.mediaNoResult);
       setResult(data.url); if (data.mediaItems) setMediaHistory(data.mediaItems.filter((x: MediaHistoryItem) => x.kind === kind));
     } catch (e: any) {
@@ -166,7 +172,8 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-sm">
                 <h2 className="text-base font-black text-slate-50">{tr.generatedResult}</h2>
-                {!result && <div className="mt-4 rounded-2xl bg-slate-950 p-6 text-center text-sm leading-6 text-slate-400">{tr.resultPlaceholder}</div>}
+                {!result && !pendingTask && <div className="mt-4 rounded-2xl bg-slate-950 p-6 text-center text-sm leading-6 text-slate-400">{tr.resultPlaceholder}</div>}
+                {pendingTask && <div className="mt-4 rounded-2xl border border-brand-400/40 bg-brand-500/10 p-4 text-sm leading-6 text-brand-100">视频任务已提交，正在排队生成。任务ID：<span className="font-mono text-xs">{pendingTask}</span><br />请稍后刷新历史记录查看结果。</div>}
                 {result && (kind === 'video' ? <video src={result} controls className="mt-4 w-full rounded-2xl" /> : <audio src={result} controls className="mt-4 w-full" />)}
                 {result && <a href={result} download={downloadName(kind)} className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white">⬇️ {tr.downloadResult}</a>}
               </div>
