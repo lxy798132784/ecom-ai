@@ -167,7 +167,6 @@ export async function generateMedia(payload: MediaRequestPayload) {
         style: payload.style,
         duration: payload.duration,
         aspect_ratio: payload.aspectRatio,
-        response_format: 'url',
       };
 
       // POST to /v1/chat/completions on the provider's base URL
