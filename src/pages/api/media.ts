@@ -4,7 +4,7 @@ import { generateMedia } from '../../lib/multimodal';
 import { addMediaHistory } from '../../lib/mediaStore';
 import { normalizeEmail } from '../../lib/users';
 
-export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 60 } };
+export const config = { api: { bodyParser: { sizeLimit: '50mb' }, maxDuration: 120 } };
 
 type MediaKind = 'video' | 'audio' | 'voice-clone';
 

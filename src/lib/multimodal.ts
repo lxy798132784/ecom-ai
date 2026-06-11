@@ -156,26 +156,74 @@ export async function generateMedia(payload: MediaRequestPayload) {
   try {
     const r = await withProviderFallback(payload.kind, async (provider) => {
       const client = buildClient(provider);
-      const body: Record<string, any> = {
-        model: provider.model || envCfg.model,
-        messages: [{ role: 'user', content: payload.prompt }],
-      };
-      // Add media-specific fields if present
-      if (payload.inputUrl) {
-        body.input_url = payload.inputUrl;
-        body.image = payload.inputUrl;
-      }
-      if (payload.voiceSample) {
-        body.voice_sample = payload.voiceSample;
-        body.reference_audio = payload.voiceSample;
-      }
-      if (payload.style) body.style = payload.style;
-      if (payload.duration !== undefined) body.duration = payload.duration;
-      if (payload.aspectRatio) body.aspect_ratio = payload.aspectRatio;
-
-      // POST to /v1/chat/completions on the provider's base URL
       const baseURL = provider.baseURL.replace(/\/+$/, '');
-      const fullURL = `${baseURL}/v1/chat/completions`;
+
+      // ── video: async task (create + poll) ──────────────────────────────
+      if (payload.kind === 'video') {
+        // Step 1: Create task
+        const createBody: Record<string, any> = {
+          model: provider.model || envCfg.model,
+          prompt: payload.prompt,
+        };
+        if (payload.inputUrl) createBody.image = payload.inputUrl;
+        if (payload.aspectRatio) createBody.aspect_ratio = payload.aspectRatio;
+
+        let createResp = await fetch(`${baseURL}/v1/video/generations`, {
+          method: 'POST',
+          headers: client.headers,
+          body: JSON.stringify(createBody),
+        });
+        let createData: any = await parseResp(createResp);
+        if (!createResp.ok)
+          throw new Error(createData?.error?.message || createData?.error || createData?.message || `Provider HTTP ${createResp.status}`);
+
+        const taskId = createData.task_id || createData.id;
+        if (!taskId) throw new Error('No task_id returned');
+
+        // Step 2: Poll status
+        for (let attempt = 0; attempt < 60; attempt++) {
+          if (attempt > 0) await sleep(5000);
+          const statusResp = await fetch(`${baseURL}/videos/${taskId}`, {
+            headers: client.headers,
+          });
+          const statusData: any = await parseResp(statusResp);
+
+          const status = statusData.status;
+          if (status === 'completed') {
+            const url = statusData.video_url || statusData.url || statusData.output_url || '';
+            if (!url) throw new Error('Completed but no video URL');
+            return { url, model: createData.model || '', raw: statusData };
+          }
+          if (status === 'failed') {
+            const err = statusData.error || 'Unknown error';
+            throw new Error(`Video generation failed: ${err}`);
+          }
+          // queued / processing / running
+        }
+        throw new Error('Video generation timed out after 5 minutes');
+      }
+
+      // ── audio / voice-clone: synchronous ───────────────────────────────
+      let fullURL: string;
+      let body: Record<string, any>;
+
+      if (payload.kind === 'audio') {
+        fullURL = `${baseURL}/v1/audio/speech`;
+        body = {
+          model: provider.model || envCfg.model,
+          input: payload.text || payload.prompt,
+          voice: payload.voiceSample,
+        };
+        if (payload.style) body.style = payload.style;
+      } else {
+        // voice-clone
+        fullURL = `${baseURL}/v1/audio/speech`;
+        body = {
+          model: provider.model || envCfg.model,
+          input: payload.text || payload.prompt,
+          reference_audio: payload.voiceSample,
+        };
+      }
 
       const resp = await fetch(fullURL, {
         method: 'POST',
@@ -219,6 +267,18 @@ export async function generateMedia(payload: MediaRequestPayload) {
     provider: usedProvider?.name || '',
     raw: result.raw,
   };
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function parseResp(resp: Response): Promise<any> {
+  return resp.text().then((text) => {
+    try { return JSON.parse(text); } catch { return { raw: text }; }
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function requiredEnv(kind: MediaKind) {
