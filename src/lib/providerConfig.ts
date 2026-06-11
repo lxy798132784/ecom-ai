@@ -92,10 +92,12 @@ function maskKey(apiKey: string) {
 
 export function normalizeBaseURL(input: string) {
   const url = String(input || '').trim().replace(/\/+$/, '');
-  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+  // Strip common API path suffixes: /v1, /v2, /api, /v1/xxx
+  const stripped = url.replace(/(\/v\d+|\/api)(\/.*)?$/, '');
+  if (stripped && !stripped.startsWith('http://') && !stripped.startsWith('https://')) {
     throw new Error(`URL 必须以 http:// 或 https:// 开头，当前值：${input}`);
   }
-  return url;
+  return stripped;
 }
 
 // ── per-kind KV ──────────────────────────────────────────────────────────────
