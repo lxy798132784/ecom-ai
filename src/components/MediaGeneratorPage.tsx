@@ -86,7 +86,7 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
       if (stopped) return;
       attempts += 1;
       try {
-        const qs = new URLSearchParams({ kind, taskId: pendingTask, prompt, inputUrl });
+        const qs = new URLSearchParams({ kind, taskId: pendingTask, prompt });
         const res = await fetch(`/api/media-task?${qs.toString()}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.error) throw new Error(data.error || tr.mediaGenerateFailed);
