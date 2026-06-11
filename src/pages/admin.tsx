@@ -249,6 +249,10 @@ export default function AdminPage() {
   const saveProvider = async (provider?: AdminProvider) => {
     const payload = provider || newProvider;
     const label = KIND_LABELS[currentKind];
+    if (!payload.model.trim()) {
+      setError(`请先点击「获取模型列表」，然后从下拉框选择模型`);
+      return;
+    }
     setMessage(`保存${label}配置中...`); setError('');
     try {
       const res = await fetch(`/api/admin/providers?kind=${currentKind}`, {
@@ -424,29 +428,33 @@ export default function AdminPage() {
           </div>
           {/* ── Add Form ── */}
           <div className="space-y-2">
-            <div className="grid gap-2 md:grid-cols-6">
-              <input value={newProvider.name} onChange={e => setNewProvider(v => ({ ...v, name: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].name} className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-1" />
-              <input value={newProvider.baseURL} onChange={e => setNewProvider(v => ({ ...v, baseURL: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].url} className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-2" />
+            <div className="grid gap-2 md:grid-cols-[1fr_2fr_1fr_auto_auto]">
+              <input value={newProvider.name} onChange={e => setNewProvider(v => ({ ...v, name: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].name} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <input value={newProvider.baseURL} onChange={e => setNewProvider(v => ({ ...v, baseURL: e.target.value }))} placeholder={KIND_PLACEHOLDERS[currentKind].url} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
               <input type="password" value={newProvider.apiKey} onChange={e => setNewProvider(v => ({ ...v, apiKey: e.target.value }))} placeholder="API Key" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
               <button type="button" onClick={fetchModels} disabled={fetchingModels || !newProvider.baseURL || !newProvider.apiKey} className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white whitespace-nowrap hover:bg-indigo-700 disabled:opacity-50">{fetchingModels ? '获取中...' : '获取模型列表'}</button>
               <button type="button" onClick={() => saveProvider()} className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white whitespace-nowrap">{KIND_LABELS[currentKind].replace('模型', '')}模型</button>
             </div>
-            {/* Available models dropdown */}
-            {availableModels.length > 0 && (
-              <div className="flex gap-2 items-center flex-wrap">
-                <span className="text-xs text-slate-500">从 Provider 获取到 {availableModels.length} 个模型，选择使用：</span>
-                <select
-                  value={newProvider.model}
-                  onChange={e => setNewProvider(v => ({ ...v, model: e.target.value }))}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm flex-1 min-w-48"
-                >
-                  <option value="">-- 手动输入模型名或从列表选择 --</option>
-                  {availableModels.map(m => (
-                    <option key={m.id} value={m.id}>{m.id} {m.ownedBy ? `(${m.ownedBy})` : ''}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Model select — only from fetched models */}
+            <div className="flex gap-2 items-center flex-wrap">
+              <span className="text-xs text-slate-500">模型：</span>
+              <select
+                value={newProvider.model}
+                onChange={e => setNewProvider(v => ({ ...v, model: e.target.value }))}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm flex-1 min-w-48"
+              >
+                {availableModels.length === 0 ? (
+                  <option value="">— 先点击「获取模型列表」 —</option>
+                ) : (
+                  <>
+                    <option value="">— 选择模型 —</option>
+                    {availableModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.id} {m.ownedBy ? `(${m.ownedBy})` : ''}</option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
             {fetchModelError && <div className="text-xs text-red-600">{fetchModelError}</div>}
           </div>
           {/* ── Provider List ── */}
