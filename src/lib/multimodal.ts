@@ -170,7 +170,11 @@ export async function generateMedia(payload: MediaRequestPayload) {
         response_format: 'url',
       };
 
-      const resp = await fetch(client.url, {
+      // POST to /v1/chat/completions on the provider's base URL
+      const baseURL = provider.baseURL.replace(/\/+$/, '');
+      const fullURL = `${baseURL}/v1/chat/completions`;
+
+      const resp = await fetch(fullURL, {
         method: 'POST',
         headers: client.headers,
         body: JSON.stringify(body),
