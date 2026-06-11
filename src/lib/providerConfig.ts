@@ -146,19 +146,29 @@ export async function getActiveProviders(
   kind: ProviderType
 ): Promise<RuntimeProvider[]> {
   const rows = await listProviders(kind);
-  const configured = rows
-    .filter((row) => row.enabled !== false)
-    .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0))
-    .map((row) => ({
+  const configured: RuntimeProvider[] = [];
+  for (const row of rows) {
+    if (row.enabled === false) continue;
+    let baseURL: string;
+    try {
+      baseURL = normalizeBaseURL(row.baseURL);
+    } catch {
+      console.warn(`Provider ${row.id}/${row.name} has invalid baseURL, skipping: ${row.baseURL}`);
+      continue;
+    }
+    const apiKey = decrypt(row.apiKeyEnc);
+    if (!baseURL || !row.model || !apiKey) continue;
+    configured.push({
       id: row.id,
       name: row.name || row.id,
-      baseURL: normalizeBaseURL(row.baseURL),
+      baseURL,
       model: row.model,
-      apiKey: decrypt(row.apiKeyEnc),
-      enabled: row.enabled !== false,
+      apiKey,
+      enabled: true,
       priority: Number(row.priority || 0),
-    }))
-    .filter((row) => row.baseURL && row.model && row.apiKey);
+    });
+  }
+  configured.sort((a, b) => a.priority - b.priority);
 
   // Env fallback — only when no stored providers at all (mirrors image behavior)
   const envProvider = envProviderFor(kind);
