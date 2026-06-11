@@ -78,6 +78,35 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
   const [mediaHistory, setMediaHistory] = useState<MediaHistoryItem[]>([]);
   useEffect(() => { const input = typeof router.query.input === 'string' ? router.query.input : ''; if (input && !inputUrl) setInputUrl(input); }, [router.query.input, inputUrl]);
   useEffect(() => { if (loggedIn) fetch(`/api/media-history?kind=${kind}`).then(r => r.json()).then(d => setMediaHistory(d.items || [])).catch(() => {}); }, [loggedIn, kind]);
+  useEffect(() => {
+    if (!pendingTask || kind !== 'video') return;
+    let stopped = false;
+    let attempts = 0;
+    const poll = async () => {
+      if (stopped) return;
+      attempts += 1;
+      try {
+        const qs = new URLSearchParams({ kind, taskId: pendingTask, prompt, inputUrl });
+        const res = await fetch(`/api/media-task?${qs.toString()}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || tr.mediaGenerateFailed);
+        if (data.completed && data.url) {
+          setResult(data.url);
+          setPendingTask('');
+          if (data.mediaItems) setMediaHistory(data.mediaItems.filter((x: MediaHistoryItem) => x.kind === kind));
+          return;
+        }
+      } catch (e: any) {
+        setError(e?.message || tr.mediaRetryLater);
+        setPendingTask('');
+        return;
+      }
+      if (attempts < 120) setTimeout(poll, 5000);
+      else { setError('视频生成时间较长，请稍后在历史记录中查看。'); setPendingTask(''); }
+    };
+    const timer = setTimeout(poll, 5000);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [pendingTask, kind, prompt, inputUrl, tr.mediaGenerateFailed, tr.mediaRetryLater]);
 
   const generate = async () => {
     if (!loggedIn) { signIn(); return; }
@@ -173,7 +202,11 @@ export function MediaGeneratorPage({ kind, title, subtitle, emoji, promptPlaceho
               <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-sm">
                 <h2 className="text-base font-black text-slate-50">{tr.generatedResult}</h2>
                 {!result && !pendingTask && <div className="mt-4 rounded-2xl bg-slate-950 p-6 text-center text-sm leading-6 text-slate-400">{tr.resultPlaceholder}</div>}
-                {pendingTask && <div className="mt-4 rounded-2xl border border-brand-400/40 bg-brand-500/10 p-4 text-sm leading-6 text-brand-100">视频任务已提交，正在排队生成。任务ID：<span className="font-mono text-xs">{pendingTask}</span><br />请稍后刷新历史记录查看结果。</div>}
+                {pendingTask && (
+                  <div className="mt-4 rounded-2xl border border-brand-400/40 bg-brand-500/10 p-4 text-sm leading-6 text-brand-100">
+                    视频任务已提交，正在自动等待生成结果。任务ID：<span className="font-mono text-xs">{pendingTask}</span><br />完成后会自动显示视频并保存到历史记录。
+                  </div>
+                )}
                 {result && (kind === 'video' ? <video src={result} controls className="mt-4 w-full rounded-2xl" /> : <audio src={result} controls className="mt-4 w-full" />)}
                 {result && <a href={result} download={downloadName(kind)} className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white">⬇️ {tr.downloadResult}</a>}
               </div>
